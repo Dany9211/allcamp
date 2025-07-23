@@ -34,31 +34,50 @@ if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
 
 filters = {}
 
+# --- COLONNE DA ESCLUDERE PER FILTRI ---
+exclude_columns = [
+    "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht",
+    "sesto_gol_home", "settimo_gol_home", "ottavo_gol_home", "nono_gol_home",
+    "sesto_gol_away", "settimo_gol_away", "ottavo_gol_away", "nono_gol_away"
+]
+
 # --- FILTRI ---
 for col in df.columns:
-    if col.lower() in ["gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht"]:
+    if col.lower() in exclude_columns:
         continue
     if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data" or \
        any(keyword in col.lower() for keyword in ["primo", "secondo", "terzo", "quarto", "quinto"]):
         continue
 
-    # Proviamo a convertire la colonna in numerico
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
-    # Se abbiamo almeno 2 valori numerici validi, creiamo uno slider
+
+    # Filtro speciale per odd_home, odd_away, odd_draw
+    if col.lower() in ["odd_home", "odd_away", "odd_draw"]:
+        min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
+        max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
+        min_input = st.text_input(f"Min {col}", str(min_val))
+        max_input = st.text_input(f"Max {col}", str(max_val))
+        try:
+            min_input = float(min_input)
+            max_input = float(max_input)
+            filters[col] = ((min_input, max_input), col_temp)
+        except:
+            st.warning(f"Valori non validi per {col}, usare numeri validi.")
+        continue
+
+    # Filtri standard
     if col_temp.notnull().sum() >= 2:
         min_val = float(col_temp.min(skipna=True))
         max_val = float(col_temp.max(skipna=True))
         if pd.notna(min_val) and pd.notna(max_val) and min_val != max_val:
-            step_val = 0.01
             selected_range = st.slider(
                 f"Filtro per {col}",
                 min_val, max_val,
                 (min_val, max_val),
-                step=step_val
+                step=0.01
             )
             filters[col] = (selected_range, col_temp)
     else:
-        # Colonna non numerica: selectbox
         unique_vals = df[col].dropna().unique().tolist()
         if len(unique_vals) > 0:
             selected_val = st.selectbox(
@@ -111,7 +130,6 @@ def mostra_distribuzione(df, col_risultato, titolo):
     distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
     st.table(distribuzione)
 
-    # WinRate 1X2
     count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
               distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
     count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
