@@ -36,16 +36,41 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
-# --- FILTRI QUOTE ---
-st.sidebar.header("Filtri Quote")
 filters = {}
 
-def add_range_filter(col_name):
+# --- FILTRO LEAGUE ---
+if "league" in df.columns:
+    leagues = ["Tutte"] + sorted(df["league"].dropna().unique())
+    selected_league = st.sidebar.selectbox("Seleziona League", leagues)
+    if selected_league != "Tutte":
+        filters["league"] = selected_league
+
+# --- FILTRO ANNO ---
+if "anno" in df.columns:
+    anni = ["Tutti"] + sorted(df["anno"].dropna().unique())
+    selected_anno = st.sidebar.selectbox("Seleziona Anno", anni)
+    if selected_anno != "Tutti":
+        filters["anno"] = selected_anno
+
+# --- FILTRO GIORNATA ---
+if "giornata" in df.columns:
+    giornata_min = int(df["giornata"].min())
+    giornata_max = int(df["giornata"].max())
+    giornata_range = st.sidebar.slider(
+        "Seleziona Giornata",
+        min_value=giornata_min,
+        max_value=giornata_max,
+        value=(giornata_min, giornata_max)
+    )
+    filters["giornata"] = giornata_range
+
+# --- FILTRI QUOTE (range digitabile) ---
+def add_range_filter(col_name, label=None):
     if col_name in df.columns:
         col_min = float(pd.to_numeric(df[col_name], errors="coerce").min())
         col_max = float(pd.to_numeric(df[col_name], errors="coerce").max())
-        min_val = st.sidebar.text_input(f"Min {col_name}", value=str(round(col_min, 2)))
-        max_val = st.sidebar.text_input(f"Max {col_name}", value=str(round(col_max, 2)))
+        min_val = st.sidebar.text_input(f"Min {label or col_name}", value=str(round(col_min, 2)))
+        max_val = st.sidebar.text_input(f"Max {label or col_name}", value=str(round(col_max, 2)))
         try:
             min_val = float(min_val)
             max_val = float(max_val)
@@ -53,33 +78,54 @@ def add_range_filter(col_name):
         except:
             st.sidebar.warning(f"Valori non validi per {col_name}")
 
+st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_away", "odd_draw", "odd_over_2_5"]:
     add_range_filter(col)
 
-# --- FILTRO RISULTATO HT ---
-selected_ht = None
-if "risultato_ht" in df.columns:
-    ht_values = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique().tolist())
-    selected_ht = st.sidebar.selectbox("Seleziona Risultato HT", ht_values)
+# --- FILTRI TIMING GOL ---
+timing_options = [
+    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
+    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
+]
+
+st.sidebar.header("Timing Gol")
+timing_filters = {}
+for col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
+            "primo_gol_away", "secondo_gol_away", "terzo_gol_away"]:
+    if col in df.columns:
+        timing_choice = st.sidebar.selectbox(f"Timing {col}", timing_options, key=col)
+        if timing_choice != "Tutti":
+            min_t, max_t = map(int, timing_choice.split('-'))
+            timing_filters[col] = (min_t, max_t)
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
+
 for col, val in filters.items():
+    if col in ["odd_home", "odd_away", "odd_draw", "odd_over_2_5"]:
+        filtered_df = filtered_df[
+            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        ]
+    elif col == "giornata":
+        filtered_df = filtered_df[
+            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        ]
+    else:
+        filtered_df = filtered_df[filtered_df[col] == val]
+
+for col, (min_t, max_t) in timing_filters.items():
     filtered_df = filtered_df[
-        pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        pd.to_numeric(filtered_df[col], errors="coerce").between(min_t, max_t)
     ]
 
-if selected_ht and selected_ht != "Tutti":
-    filtered_df = filtered_df[filtered_df["risultato_ht"] == selected_ht]
-
-if filters == {} and (not selected_ht or selected_ht == "Tutti"):
+if filters == {} and timing_filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- FUNZIONE DISTRIBUZIONE ---
+# --- FUNZIONI STATISTICHE ---
 def mostra_distribuzione(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
@@ -109,7 +155,6 @@ def mostra_distribuzione(df, col_risultato, titolo):
     st.subheader(f"Distribuzione {titolo}")
     st.table(distribuzione)
 
-    # Winrate 1X2
     count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
               distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
     count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
@@ -127,15 +172,13 @@ def mostra_distribuzione(df, col_risultato, titolo):
         "Odd Minima": [round(100/w,2) if w > 0 else "-" for w in winrate]
     }))
 
-# --- Mostra distribuzione ---
 if not filtered_df.empty:
     if "risultato_ft" in filtered_df.columns:
         mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
     if "risultato_ht" in filtered_df.columns:
         mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
 
-# --- CALCOLO BTTS e OVER ---
-if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
+    # --- BTTS e Over ---
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True).astype(int)
     filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
     filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
