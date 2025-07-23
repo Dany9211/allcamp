@@ -49,15 +49,12 @@ exclude_columns = [
 ]
 
 st.markdown("### Filtri Quote e Altri")
+
 # --- FILTRI STANDARD ---
 for col in df.columns:
     if col.lower() in exclude_columns:
         continue
     if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
-        continue
-
-    activate = st.checkbox(f"Attiva filtro per {col}", key=f"{col}_active")
-    if not activate:
         continue
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
