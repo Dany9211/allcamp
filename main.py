@@ -69,7 +69,8 @@ for col in df.columns:
         try:
             min_input = float(min_input)
             max_input = float(max_input)
-            filters[col] = ((min_input, max_input), col_temp)
+            if min_input > min_val or max_input < max_val:  # Applica filtro solo se modificato
+                filters[col] = ((min_input, max_input), col_temp)
         except:
             st.warning(f"Valori non validi per {col}, usare numeri validi.")
         continue
@@ -86,7 +87,8 @@ for col in df.columns:
                 step=0.01,
                 key=f"{col}_slider"
             )
-            filters[col] = (selected_range, col_temp)
+            if selected_range != (min_val, max_val):
+                filters[col] = (selected_range, col_temp)
     else:
         unique_vals = df[col].dropna().unique().tolist()
         if len(unique_vals) > 0:
@@ -100,13 +102,19 @@ for col in df.columns:
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
+active_filters = False
+
 for col, val in filters.items():
+    active_filters = True
     if isinstance(val, tuple) and isinstance(val[0], (float, int)):
         range_vals, col_temp = val
         mask = (col_temp >= range_vals[0]) & (col_temp <= range_vals[1])
         filtered_df = filtered_df[mask.fillna(True)]
     else:
         filtered_df = filtered_df[filtered_df[col].astype(str) == str(val)]
+
+if not active_filters:
+    st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df)
