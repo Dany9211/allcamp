@@ -94,6 +94,35 @@ st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
 
+# --- MENU TIMING GOAL ---
+timing_options = [
+    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
+    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
+]
+
+goal_filters = {
+    "home_primo_gol": st.sidebar.selectbox("Timing Primo Gol Home", timing_options),
+    "home_secondo_gol": st.sidebar.selectbox("Timing Secondo Gol Home", timing_options),
+    "home_terzo_gol": st.sidebar.selectbox("Timing Terzo Gol Home", timing_options),
+    "away_primo_gol": st.sidebar.selectbox("Timing Primo Gol Away", timing_options),
+    "away_secondo_gol": st.sidebar.selectbox("Timing Secondo Gol Away", timing_options),
+    "away_terzo_gol": st.sidebar.selectbox("Timing Terzo Gol Away", timing_options),
+}
+
+def timing_filter(df, col, selected):
+    if selected == "Tutti" or col not in df.columns:
+        return df
+    timing_ranges = {
+        "0-5": (0, 5), "6-10": (6, 10), "0-10": (0, 10),
+        "11-20": (11, 20), "21-30": (21, 30), "31-39": (31, 39),
+        "40-45": (40, 45), "46-55": (46, 55), "56-65": (56, 65),
+        "66-75": (66, 75), "76-85": (76, 85), "76-90": (76, 90),
+        "85-90": (85, 90)
+    }
+    low, high = timing_ranges[selected]
+    col_numeric = pd.to_numeric(df[col], errors="coerce")
+    return df[(col_numeric >= low) & (col_numeric <= high)]
+
 # --- PULSANTE RESET ---
 if st.sidebar.button("🔄 Reset Filtri"):
     st.session_state.clear()
@@ -101,7 +130,6 @@ if st.sidebar.button("🔄 Reset Filtri"):
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
-st.write(f"Righe prima di applicare i filtri: {len(filtered_df)}")
 
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
@@ -112,9 +140,11 @@ for col, val in filters.items():
         filtered_df = filtered_df[mask.fillna(True)]
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
-    st.write(f"Righe dopo filtro {col}: {len(filtered_df)}")
 
-if filters == {}:
+for col, val in goal_filters.items():
+    filtered_df = timing_filter(filtered_df, col, val)
+
+if filters == {} and all(v == "Tutti" for v in goal_filters.values()):
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
@@ -153,23 +183,6 @@ def mostra_distribuzione(df, col_risultato, titolo):
 
     st.subheader(f"Distribuzione {titolo}")
     st.table(distribuzione)
-
-    count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
-    count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["0-1","0-2","0-3","1-2","1-3","2-3"])].Conteggio.sum()
-    count_x = distribuzione[distribuzione["Risultato"].str.contains("pareggio")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["0-0","1-1","2-2","3-3"])].Conteggio.sum()
-
-    totale = len(df)
-    winrate = [round((count_1/totale)*100,2), round((count_x/totale)*100,2), round((count_2/totale)*100,2)]
-    st.subheader(f"WinRate 1-X-2 ({titolo})")
-    st.table(pd.DataFrame({
-        "Esito": ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)"],
-        "Conteggio": [count_1, count_x, count_2],
-        "WinRate %": winrate,
-        "Odd Minima": [round(100/w,2) if w > 0 else "-" for w in winrate]
-    }))
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
