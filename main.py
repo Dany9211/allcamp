@@ -74,16 +74,21 @@ if "risultato_ht" in df.columns:
 # --- FILTRI QUOTE MANUALI ---
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
-        col_min = float(pd.to_numeric(df[col_name], errors="coerce").min())
-        col_max = float(pd.to_numeric(df[col_name], errors="coerce").max())
-        min_val = st.sidebar.text_input(f"Min {label or col_name}", value=str(round(col_min, 2)))
-        max_val = st.sidebar.text_input(f"Max {label or col_name}", value=str(round(col_max, 2)))
-        try:
-            min_val = float(min_val)
-            max_val = float(max_val)
-            filters[col_name] = (min_val, max_val)
-        except:
-            st.sidebar.warning(f"Valori non validi per {col_name}")
+        col_temp = pd.to_numeric(df[col_name].astype(str).str.replace(",", "."), errors="coerce")
+        col_min = float(col_temp.min(skipna=True))
+        col_max = float(col_temp.max(skipna=True))
+        st.sidebar.write(f"Range attuale {col_name}: {col_min} - {col_max}")
+
+        min_val = st.sidebar.text_input(f"Min {label or col_name}", value="")
+        max_val = st.sidebar.text_input(f"Max {label or col_name}", value="")
+
+        if min_val.strip() != "" and max_val.strip() != "":
+            try:
+                min_val = float(min_val)
+                max_val = float(max_val)
+                filters[col_name] = (min_val, max_val)
+            except:
+                st.sidebar.warning(f"Valori non validi per {col_name}")
 
 st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
@@ -100,7 +105,7 @@ st.write(f"Righe prima di applicare i filtri: {len(filtered_df)}")
 
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
-        mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        mask = pd.to_numeric(filtered_df[col].astype(str).str.replace(",", "."), errors="coerce").between(val[0], val[1])
         filtered_df = filtered_df[mask.fillna(True)]
     elif col == "giornata":
         mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
@@ -168,7 +173,6 @@ def mostra_distribuzione(df, col_risultato, titolo):
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
-    # Conversione robusta senza eliminare righe
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
     temp_ft = temp_ft.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
     filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
