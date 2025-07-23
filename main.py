@@ -34,6 +34,29 @@ if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
 
 filters = {}
 
+# --- Timing predefinito per gol ---
+timing_options = [
+    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
+    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
+]
+
+special_gol_cols = [
+    "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
+    "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
+]
+
+st.markdown("### Filtri Timing Gol")
+for col in special_gol_cols:
+    if col in df.columns:
+        selected_timing = st.selectbox(
+            f"Timing {col.replace('_', ' ').capitalize()}",
+            timing_options,
+            key=f"{col}_timing"
+        )
+        if selected_timing != "Tutti":
+            min_t, max_t = map(int, selected_timing.split('-'))
+            filters[col] = (min_t, max_t)
+
 # --- COLONNE DA ESCLUDERE ---
 exclude_columns = [
     "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht",
@@ -52,7 +75,7 @@ st.markdown("### Filtri Quote e Altri")
 
 # --- FILTRI STANDARD ---
 for col in df.columns:
-    if col.lower() in exclude_columns:
+    if col.lower() in exclude_columns or col in special_gol_cols:
         continue
     if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
         continue
@@ -106,7 +129,13 @@ active_filters = False
 
 for col, val in filters.items():
     active_filters = True
-    if isinstance(val, tuple) and isinstance(val[0], (float, int)):
+    if col in special_gol_cols:
+        min_t, max_t = val
+        filtered_df = filtered_df[
+            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) >= min_t) &
+            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) <= max_t)
+        ]
+    elif isinstance(val, tuple) and isinstance(val[0], (float, int)):
         range_vals, col_temp = val
         mask = (col_temp >= range_vals[0]) & (col_temp <= range_vals[1])
         filtered_df = filtered_df[mask.fillna(True)]
