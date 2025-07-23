@@ -24,7 +24,7 @@ def run_query(query: str):
 # --- Caricamento dati ---
 try:
     df = run_query('SELECT * FROM "allcamp";')
-    st.write(f"**Righe totali nel dataset:** {len(df)}")
+    st.write(f"**Righe iniziali nel dataset:** {len(df)}")
 except Exception as e:
     st.error(f"Errore durante il caricamento: {e}")
     st.stop()
@@ -96,6 +96,7 @@ if st.sidebar.button("🔄 Reset Filtri"):
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
+st.write(f"Righe prima di applicare i filtri: {len(filtered_df)}")
 
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
@@ -106,6 +107,7 @@ for col, val in filters.items():
         filtered_df = filtered_df[mask.fillna(True)]
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
+    st.write(f"Righe dopo filtro {col}: {len(filtered_df)}")
 
 if filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
@@ -123,7 +125,10 @@ def mostra_distribuzione(df, col_risultato, titolo):
         "3-0", "3-1", "3-2", "3-3"
     ]
     def classifica_risultato(ris):
-        home, away = map(int, ris.split("-"))
+        try:
+            home, away = map(int, ris.split("-"))
+        except:
+            return "Altro"
         if ris in risultati_interessanti:
             return ris
         if home > away:
@@ -162,17 +167,18 @@ def mostra_distribuzione(df, col_risultato, titolo):
     }))
 
 # --- STATISTICHE ---
-if not filtered_df.empty:
-    if "risultato_ft" in filtered_df.columns:
-        mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
+if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
+    # Conversione robusta senza eliminare righe
+    temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
+    temp_ft = temp_ft.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
+    filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
+    filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
+
+    mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
     if "risultato_ht" in filtered_df.columns:
         mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
 
     # --- BTTS e Over ---
-    temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True).astype(int)
-    filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
-    filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
-
     st.subheader("BTTS (Both Teams To Score)")
     btts = (filtered_df["home_g_ft"] > 0) & (filtered_df["away_g_ft"] > 0)
     st.write(f"Partite BTTS SI: {btts.sum()} ({round(btts.mean()*100,2)}%)")
