@@ -82,22 +82,6 @@ st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_away", "odd_draw", "odd_over_2_5"]:
     add_range_filter(col)
 
-# --- FILTRI TIMING GOL ---
-timing_options = [
-    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
-    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
-]
-
-st.sidebar.header("Timing Gol")
-timing_filters = {}
-for col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
-            "primo_gol_away", "secondo_gol_away", "terzo_gol_away"]:
-    if col in df.columns:
-        timing_choice = st.sidebar.selectbox(f"Timing {col}", timing_options, key=col)
-        if timing_choice != "Tutti":
-            min_t, max_t = map(int, timing_choice.split('-'))
-            timing_filters[col] = (min_t, max_t)
-
 # --- PULSANTE RESET FILTRI ---
 if st.sidebar.button("🔄 Reset Filtri"):
     st.session_state.clear()
@@ -116,11 +100,7 @@ for col, val in filters.items():
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
 
-for col, (min_t, max_t) in timing_filters.items():
-    mask = pd.to_numeric(filtered_df[col], errors="coerce").between(min_t, max_t)
-    filtered_df = filtered_df[mask.fillna(True)]
-
-if filters == {} and timing_filters == {}:
+if filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
@@ -197,37 +177,3 @@ if not filtered_df.empty:
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-
-    # --- FIRST TO SCORE ---
-    if "primo_gol_home" in filtered_df.columns and "primo_gol_away" in filtered_df.columns:
-        def calcola_first_to_score(row):
-            h = pd.to_numeric(row["primo_gol_home"], errors="coerce")
-            a = pd.to_numeric(row["primo_gol_away"], errors="coerce")
-            if pd.isna(h) and pd.isna(a):
-                return None
-            if pd.isna(a) or (not pd.isna(h) and h < a):
-                return "Home"
-            elif pd.isna(h) or (not pd.isna(a) and a < h):
-                return "Away"
-            return None
-
-        filtered_df["first_to_score"] = filtered_df.apply(calcola_first_to_score, axis=1)
-
-        valid_first = filtered_df.dropna(subset=["first_to_score"])
-        total_first = len(valid_first)
-        home_first = (valid_first["first_to_score"] == "Home").sum()
-        away_first = (valid_first["first_to_score"] == "Away").sum()
-
-        st.subheader("First to Score")
-        if total_first > 0:
-            first_data = pd.DataFrame({
-                "Squadra": ["Home", "Away"],
-                "Conteggio": [home_first, away_first],
-                "Percentuale %": [round(home_first / total_first * 100, 2),
-                                  round(away_first / total_first * 100, 2)],
-                "Odd Minima": [round(100 / (home_first / total_first * 100), 2) if home_first > 0 else "-",
-                               round(100 / (away_first / total_first * 100), 2) if away_first > 0 else "-"]
-            })
-            st.table(first_data)
-        else:
-            st.write("Nessuna partita valida per il calcolo di First to Score.")
