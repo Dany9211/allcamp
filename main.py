@@ -2,6 +2,7 @@ import streamlit as st
 import psycopg2
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Allcamp Viewer", layout="wide")
 st.title("Analisi Tabella allcamp")
@@ -94,35 +95,6 @@ st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
 
-# --- MENU TIMING GOAL ---
-timing_options = [
-    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
-    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
-]
-
-goal_filters = {
-    "home_primo_gol": st.sidebar.selectbox("Timing Primo Gol Home", timing_options),
-    "home_secondo_gol": st.sidebar.selectbox("Timing Secondo Gol Home", timing_options),
-    "home_terzo_gol": st.sidebar.selectbox("Timing Terzo Gol Home", timing_options),
-    "away_primo_gol": st.sidebar.selectbox("Timing Primo Gol Away", timing_options),
-    "away_secondo_gol": st.sidebar.selectbox("Timing Secondo Gol Away", timing_options),
-    "away_terzo_gol": st.sidebar.selectbox("Timing Terzo Gol Away", timing_options),
-}
-
-def timing_filter(df, col, selected):
-    if selected == "Tutti" or col not in df.columns:
-        return df
-    timing_ranges = {
-        "0-5": (0, 5), "6-10": (6, 10), "0-10": (0, 10),
-        "11-20": (11, 20), "21-30": (21, 30), "31-39": (31, 39),
-        "40-45": (40, 45), "46-55": (46, 55), "56-65": (56, 65),
-        "66-75": (66, 75), "76-85": (76, 85), "76-90": (76, 90),
-        "85-90": (85, 90)
-    }
-    low, high = timing_ranges[selected]
-    col_numeric = pd.to_numeric(df[col], errors="coerce")
-    return df[(col_numeric >= low) & (col_numeric <= high)]
-
 # --- PULSANTE RESET ---
 if st.sidebar.button("🔄 Reset Filtri"):
     st.session_state.clear()
@@ -141,15 +113,33 @@ for col, val in filters.items():
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
 
-for col, val in goal_filters.items():
-    filtered_df = timing_filter(filtered_df, col, val)
-
-if filters == {} and all(v == "Tutti" for v in goal_filters.values()):
+if filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
+
+# --- FUNZIONI GRAFICI ---
+def plot_distribuzione(df, col_risultato, titolo):
+    distribuzione = df[col_risultato].value_counts().reset_index()
+    distribuzione.columns = ["Risultato", "Conteggio"]
+    top5 = distribuzione.head(5)
+
+    fig, ax = plt.subplots()
+    ax.bar(top5["Risultato"], top5["Conteggio"])
+    ax.set_title(f"Top 5 Risultati {titolo}")
+    ax.set_ylabel("Conteggio")
+    ax.set_xlabel("Risultato")
+    st.pyplot(fig)
+
+def plot_winrate(winrate):
+    fig, ax = plt.subplots()
+    labels = ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)"]
+    ax.bar(labels, winrate)
+    ax.set_title("WinRate 1-X-2 (%)")
+    ax.set_ylabel("Percentuale")
+    st.pyplot(fig)
 
 # --- FUNZIONE DISTRIBUZIONE ---
 def mostra_distribuzione(df, col_risultato, titolo):
@@ -184,6 +174,27 @@ def mostra_distribuzione(df, col_risultato, titolo):
     st.subheader(f"Distribuzione {titolo}")
     st.table(distribuzione)
 
+    count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
+              distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
+    count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
+              distribuzione[distribuzione["Risultato"].isin(["0-1","0-2","0-3","1-2","1-3","2-3"])].Conteggio.sum()
+    count_x = distribuzione[distribuzione["Risultato"].str.contains("pareggio")].Conteggio.sum() + \
+              distribuzione[distribuzione["Risultato"].isin(["0-0","1-1","2-2","3-3"])].Conteggio.sum()
+
+    totale = len(df)
+    winrate = [round((count_1/totale)*100,2), round((count_x/totale)*100,2), round((count_2/totale)*100,2)]
+    st.subheader(f"WinRate 1-X-2 ({titolo})")
+    st.table(pd.DataFrame({
+        "Esito": ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)"],
+        "Conteggio": [count_1, count_x, count_2],
+        "WinRate %": winrate,
+        "Odd Minima": [round(100/w,2) if w > 0 else "-" for w in winrate]
+    }))
+
+    # --- GRAFICI ---
+    plot_distribuzione(df, col_risultato, titolo)
+    plot_winrate(winrate)
+
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
@@ -206,30 +217,12 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         count = (filtered_df["tot_goals_ft"] > t).sum()
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
-    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+    over_df = pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+    st.table(over_df)
 
-    # --- FIRST TO SCORE ---
-    if "home_primo_gol" in filtered_df.columns and "away_primo_gol" in filtered_df.columns:
-        def calcola_first_to_score(row):
-            h = pd.to_numeric(row["home_primo_gol"], errors="coerce")
-            a = pd.to_numeric(row["away_primo_gol"], errors="coerce")
-            if pd.isna(h) and pd.isna(a):
-                return "Nessuno"
-            if pd.isna(a) or (not pd.isna(h) and h < a):
-                return "Home"
-            if pd.isna(h) or (not pd.isna(a) and a < h):
-                return "Away"
-            return "Nessuno"
-
-        filtered_df["first_to_score"] = filtered_df.apply(calcola_first_to_score, axis=1)
-        valid_ft = filtered_df[filtered_df["first_to_score"] != "Nessuno"]
-
-        st.subheader("First to Score")
-        if not valid_ft.empty:
-            fts = valid_ft["first_to_score"].value_counts().reset_index()
-            fts.columns = ["First to Score", "Conteggio"]
-            fts["Percentuale %"] = (fts["Conteggio"] / len(valid_ft) * 100).round(2)
-            fts["Odd Minima"] = fts["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-            st.table(fts)
-        else:
-            st.write("Nessuna partita valida per il calcolo del First to Score.")
+    # --- GRAFICO OVER ---
+    fig, ax = plt.subplots()
+    ax.bar(over_df["Mercato"], over_df["Percentuale %"])
+    ax.set_title("Percentuali Over Goals (FT)")
+    ax.set_ylabel("%")
+    st.pyplot(fig)
