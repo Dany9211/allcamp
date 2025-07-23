@@ -34,29 +34,6 @@ if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
 
 filters = {}
 
-# --- Timing predefinito ---
-timing_options = [
-    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
-    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
-]
-
-# --- Filtri speciali per timing gol ---
-special_gol_cols = [
-    "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
-    "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
-]
-
-for col in special_gol_cols:
-    if col in df.columns:
-        selected_timing = st.selectbox(
-            f"Timing {col.replace('_', ' ').capitalize()}",
-            timing_options,
-            key=col
-        )
-        if selected_timing != "Tutti":
-            min_t, max_t = map(int, selected_timing.split('-'))
-            filters[col] = (min_t, max_t)
-
 # --- COLONNE DA ESCLUDERE ---
 exclude_columns = [
     "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht",
@@ -67,14 +44,20 @@ exclude_columns = [
     "odd_over_0_5", "odd_over_1_5", "odd_over_3_5", "odd_over_4_5",
     "odd_under_0_5", "odd_under_1_5",
     "primo_gol_home_", "quarto_gol_home", "quinto_gol_home",
-    "quarto_gol_away", "quinto_gol_away"
+    "quarto_gol_away", "quinto_gol_away",
+    "btts_si", "elohomeo", "eloawayo", "formah", "formaa"
 ]
 
+st.markdown("### Filtri Quote e Altri")
 # --- FILTRI STANDARD ---
 for col in df.columns:
-    if col.lower() in exclude_columns or col in special_gol_cols:
+    if col.lower() in exclude_columns:
         continue
     if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
+        continue
+
+    activate = st.checkbox(f"Attiva filtro per {col}", key=f"{col}_active")
+    if not activate:
         continue
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
@@ -84,8 +67,8 @@ for col in df.columns:
         min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
         max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
         st.write(f"**Filtro per {col}**")
-        min_input = st.text_input(f"Min {col}", str(min_val))
-        max_input = st.text_input(f"Max {col}", str(max_val))
+        min_input = st.text_input(f"Min {col}", str(min_val), key=f"{col}_min")
+        max_input = st.text_input(f"Max {col}", str(max_val), key=f"{col}_max")
         try:
             min_input = float(min_input)
             max_input = float(max_input)
@@ -100,10 +83,11 @@ for col in df.columns:
         max_val = float(col_temp.max(skipna=True))
         if pd.notna(min_val) and pd.notna(max_val) and min_val != max_val:
             selected_range = st.slider(
-                f"Filtro per {col}",
+                f"Seleziona range per {col}",
                 min_val, max_val,
                 (min_val, max_val),
-                step=0.01
+                step=0.01,
+                key=f"{col}_slider"
             )
             filters[col] = (selected_range, col_temp)
     else:
@@ -111,7 +95,8 @@ for col in df.columns:
         if len(unique_vals) > 0:
             selected_val = st.selectbox(
                 f"Filtra per {col} (opzionale)",
-                ["Tutti"] + [str(v) for v in unique_vals]
+                ["Tutti"] + [str(v) for v in unique_vals],
+                key=f"{col}_select"
             )
             if selected_val != "Tutti":
                 filters[col] = selected_val
@@ -119,13 +104,7 @@ for col in df.columns:
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
 for col, val in filters.items():
-    if col in special_gol_cols:
-        min_t, max_t = val
-        filtered_df = filtered_df[
-            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) >= min_t) &
-            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) <= max_t)
-        ]
-    elif isinstance(val, tuple) and isinstance(val[0], (float, int)):
+    if isinstance(val, tuple) and isinstance(val[0], (float, int)):
         range_vals, col_temp = val
         mask = (col_temp >= range_vals[0]) & (col_temp <= range_vals[1])
         filtered_df = filtered_df[mask.fillna(True)]
