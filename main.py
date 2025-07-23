@@ -172,6 +172,7 @@ def mostra_distribuzione(df, col_risultato, titolo):
         "Odd Minima": [round(100/w,2) if w > 0 else "-" for w in winrate]
     }))
 
+# --- STATISTICHE ---
 if not filtered_df.empty:
     if "risultato_ft" in filtered_df.columns:
         mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
@@ -194,3 +195,37 @@ if not filtered_df.empty:
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+    # --- FIRST TO SCORE ---
+    if "primo_gol_home" in filtered_df.columns and "primo_gol_away" in filtered_df.columns:
+        def calcola_first_to_score(row):
+            h = pd.to_numeric(row["primo_gol_home"], errors="coerce")
+            a = pd.to_numeric(row["primo_gol_away"], errors="coerce")
+            if pd.isna(h) and pd.isna(a):
+                return None
+            if pd.isna(a) or (not pd.isna(h) and h < a):
+                return "Home"
+            elif pd.isna(h) or (not pd.isna(a) and a < h):
+                return "Away"
+            return None
+
+        filtered_df["first_to_score"] = filtered_df.apply(calcola_first_to_score, axis=1)
+
+        valid_first = filtered_df.dropna(subset=["first_to_score"])
+        total_first = len(valid_first)
+        home_first = (valid_first["first_to_score"] == "Home").sum()
+        away_first = (valid_first["first_to_score"] == "Away").sum()
+
+        st.subheader("First to Score")
+        if total_first > 0:
+            first_data = pd.DataFrame({
+                "Squadra": ["Home", "Away"],
+                "Conteggio": [home_first, away_first],
+                "Percentuale %": [round(home_first / total_first * 100, 2),
+                                  round(away_first / total_first * 100, 2)],
+                "Odd Minima": [round(100 / (home_first / total_first * 100), 2) if home_first > 0 else "-",
+                               round(100 / (away_first / total_first * 100), 2) if away_first > 0 else "-"]
+            })
+            st.table(first_data)
+        else:
+            st.write("Nessuna partita valida per il calcolo di First to Score.")
