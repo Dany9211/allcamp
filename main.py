@@ -24,11 +24,10 @@ def run_query(query):
 df = run_query('SELECT * FROM "allcamp";')
 st.write(f"**Righe totali nel dataset:** {len(df)}")
 
-# --- Aggiungi colonna risultato_ft ---
+# --- Aggiungi colonne risultato_ft e risultato_ht ---
 if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
     df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
 
-# --- Aggiungi colonna risultato_ht ---
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
@@ -40,6 +39,7 @@ timing_options = [
     "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
 ]
 
+# Aggiungo anche primo_gol_away
 special_gol_cols = [
     "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
     "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
@@ -150,7 +150,7 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df)
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- ANALISI E TABELLE ---
+# --- ANALISI RISULTATI ---
 def mostra_distribuzione(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
