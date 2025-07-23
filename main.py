@@ -65,7 +65,9 @@ exclude_columns = [
     "sutht", "sutht1", "sutht2", "sutat", "sutat1", "sutat2",
     "sesto_gol_home_", "odd_under_3_5", "odd_under_4_5",
     "odd_over_0_5", "odd_over_1_5", "odd_over_3_5", "odd_over_4_5",
-    "odd_under_0_5", "odd_under_1_5"
+    "odd_under_0_5", "odd_under_1_5",
+    "primo_gol_home_", "quarto_gol_home", "quinto_gol_home",
+    "quarto_gol_away", "quinto_gol_away"
 ]
 
 # --- FILTRI STANDARD ---
