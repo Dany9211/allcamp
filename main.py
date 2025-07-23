@@ -34,19 +34,45 @@ if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
 
 filters = {}
 
-# --- COLONNE DA ESCLUDERE PER FILTRI ---
+# --- Timing predefinito ---
+timing_options = [
+    "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
+    "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
+]
+
+# --- Filtri speciali per timing gol ---
+special_gol_cols = [
+    "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
+    "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
+]
+
+for col in special_gol_cols:
+    if col in df.columns:
+        selected_timing = st.selectbox(
+            f"Timing {col.replace('_', ' ').capitalize()}",
+            timing_options,
+            key=col
+        )
+        if selected_timing != "Tutti":
+            min_t, max_t = map(int, selected_timing.split('-'))
+            filters[col] = (min_t, max_t)
+
+# --- COLONNE DA ESCLUDERE ---
 exclude_columns = [
     "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht",
     "sesto_gol_home", "settimo_gol_home", "ottavo_gol_home", "nono_gol_home",
-    "sesto_gol_away", "settimo_gol_away", "ottavo_gol_away", "nono_gol_away"
+    "sesto_gol_away", "settimo_gol_away", "ottavo_gol_away", "nono_gol_away",
+    "sutht", "sutht1", "sutht2", "sutat", "sutat1", "sutat2",
+    "sesto_gol_home_", "odd_under_3_5", "odd_under_4_5",
+    "odd_over_0_5", "odd_over_1_5", "odd_over_3_5", "odd_over_4_5",
+    "odd_under_0_5", "odd_under_1_5"
 ]
 
-# --- FILTRI ---
+# --- FILTRI STANDARD ---
 for col in df.columns:
-    if col.lower() in exclude_columns:
+    if col.lower() in exclude_columns or col in special_gol_cols:
         continue
-    if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data" or \
-       any(keyword in col.lower() for keyword in ["primo", "secondo", "terzo", "quarto", "quinto"]):
+    if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
         continue
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
@@ -65,7 +91,7 @@ for col in df.columns:
             st.warning(f"Valori non validi per {col}, usare numeri validi.")
         continue
 
-    # Filtri standard
+    # Filtri standard per altre colonne numeriche
     if col_temp.notnull().sum() >= 2:
         min_val = float(col_temp.min(skipna=True))
         max_val = float(col_temp.max(skipna=True))
@@ -90,7 +116,13 @@ for col in df.columns:
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
 for col, val in filters.items():
-    if isinstance(val, tuple):
+    if col in special_gol_cols:
+        min_t, max_t = val
+        filtered_df = filtered_df[
+            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) >= min_t) &
+            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) <= max_t)
+        ]
+    elif isinstance(val, tuple) and isinstance(val[0], (float, int)):
         range_vals, col_temp = val
         mask = (col_temp >= range_vals[0]) & (col_temp <= range_vals[1])
         filtered_df = filtered_df[mask.fillna(True)]
@@ -100,61 +132,3 @@ for col, val in filters.items():
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df)
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
-
-# --- FUNZIONE DISTRIBUZIONE & WINRATE ---
-def mostra_distribuzione(df, col_risultato, titolo):
-    risultati_interessanti = [
-        "0-0", "0-1", "0-2", "0-3",
-        "1-0", "1-1", "1-2", "1-3",
-        "2-0", "2-1", "2-2", "2-3",
-        "3-0", "3-1", "3-2", "3-3"
-    ]
-
-    def classifica_risultato(ris):
-        home, away = map(int, ris.split("-"))
-        if ris in risultati_interessanti:
-            return ris
-        if home > away:
-            return "Altro risultato casa vince"
-        elif home < away:
-            return "Altro risultato ospite vince"
-        else:
-            return "Altro pareggio"
-
-    df[f"{col_risultato}_classificato"] = df[col_risultato].apply(classifica_risultato)
-
-    st.subheader(f"Distribuzione {titolo}")
-    distribuzione = df[f"{col_risultato}_classificato"].value_counts().reset_index()
-    distribuzione.columns = ["Risultato", "Conteggio"]
-    distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df) * 100).round(2)
-    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-    st.table(distribuzione)
-
-    count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
-    count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["0-1","0-2","0-3","1-2","1-3","2-3"])].Conteggio.sum()
-    count_x = distribuzione[distribuzione["Risultato"].str.contains("pareggio")].Conteggio.sum() + \
-              distribuzione[distribuzione["Risultato"].isin(["0-0","1-1","2-2","3-3"])].Conteggio.sum()
-
-    totale = len(df)
-    winrate = [
-        round((count_1/totale)*100,2),
-        round((count_x/totale)*100,2),
-        round((count_2/totale)*100,2)
-    ]
-    odd_minime = [round(100/w,2) if w>0 else "-" for w in winrate]
-
-    winrate_df = pd.DataFrame({
-        "Esito": ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)"],
-        "Conteggio": [count_1, count_x, count_2],
-        "WinRate %": winrate,
-        "Odd Minima": odd_minime
-    })
-    st.subheader(f"WinRate {titolo}")
-    st.table(winrate_df)
-
-# --- DISTRIBUZIONI FT & HT ---
-if not filtered_df.empty:
-    mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
-    mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
