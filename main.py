@@ -3,7 +3,8 @@ import psycopg2
 import pandas as pd
 import numpy as np
 
-st.title("Filtro Completo allcamp (FT, HT, BTTS & Over Goals con Odd Minima)")
+st.set_page_config(page_title="Analisi allcamp", layout="wide")
+st.title("Analisi Completa (FT, HT, BTTS, Over)")
 
 # --- Funzione di connessione a Supabase ---
 @st.cache_data
@@ -31,124 +32,59 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
+# --- FILTRI ---
 filters = {}
 
-# --- Timing predefinito per gol (solo primo, secondo, terzo - home e away) ---
+# --- Filtri per odds (range digitabile) ---
+st.sidebar.header("Filtri Quote")
+for odd_col in ["odd_home", "odd_away", "odd_draw"]:
+    if odd_col in df.columns:
+        min_val = float(pd.to_numeric(df[odd_col], errors="coerce").min())
+        max_val = float(pd.to_numeric(df[odd_col], errors="coerce").max())
+        min_input = st.sidebar.text_input(f"Min {odd_col}", value=str(round(min_val, 2)))
+        max_input = st.sidebar.text_input(f"Max {odd_col}", value=str(round(max_val, 2)))
+        try:
+            min_val_user = float(min_input)
+            max_val_user = float(max_input)
+            filters[odd_col] = (min_val_user, max_val_user)
+        except:
+            st.sidebar.warning(f"Valori non validi per {odd_col}")
+
+# --- Filtri timing gol ---
 timing_options = [
     "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
     "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
 ]
-
-special_gol_cols = [
-    "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
-    "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
-]
-
-st.markdown("### Filtri Timing Gol")
-for col in special_gol_cols:
+st.sidebar.header("Timing Gol")
+for col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
+            "primo_gol_away", "secondo_gol_away", "terzo_gol_away"]:
     if col in df.columns:
-        selected_timing = st.selectbox(
-            f"Timing {col.replace('_', ' ').capitalize()}",
-            timing_options,
-            key=f"{col}_timing"
-        )
-        if selected_timing != "Tutti":
-            min_t, max_t = map(int, selected_timing.split('-'))
+        timing_choice = st.sidebar.selectbox(f"Timing {col}", timing_options, key=col)
+        if timing_choice != "Tutti":
+            min_t, max_t = map(int, timing_choice.split('-'))
             filters[col] = (min_t, max_t)
 
-# --- COLONNE DA ESCLUDERE ---
-exclude_columns = [
-    "gol_home_ft", "gol_away_ft", "gol_home_ht", "gol_away_ht",
-    "sesto_gol_home", "settimo_gol_home", "ottavo_gol_home", "nono_gol_home",
-    "sesto_gol_away", "settimo_gol_away", "ottavo_gol_away", "nono_gol_away",
-    "sutht", "sutht1", "sutht2", "sutat", "sutat1", "sutat2",
-    "sesto_gol_home_", "odd_under_3_5", "odd_under_4_5",
-    "odd_over_0_5", "odd_over_1_5", "odd_over_3_5", "odd_over_4_5",
-    "odd_under_0_5", "odd_under_1_5",
-    "primo_gol_home_", "quarto_gol_home", "quinto_gol_home",
-    "quarto_gol_away", "quinto_gol_away",
-    "btts_si", "elohomeo", "eloawayo", "formah", "formaa",
-    "ora", "odd_under_2_5", "home_pos_tot", "away_pos_tot"
-]
-
-st.markdown("### Filtri Quote e Altri")
-
-# --- FILTRI STANDARD ---
-for col in df.columns:
-    if col.lower() in exclude_columns or col in special_gol_cols:
-        continue
-    if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
-        continue
-
-    col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
-
-    # Filtro speciale per odd_home, odd_away, odd_draw (input min e max invece di slider)
-    if col.lower() in ["odd_home", "odd_away", "odd_draw"]:
-        min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
-        max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
-        st.write(f"**Filtro per {col}**")
-        min_input = st.text_input(f"Min {col}", str(min_val), key=f"{col}_min")
-        max_input = st.text_input(f"Max {col}", str(max_val), key=f"{col}_max")
-        try:
-            min_input = float(min_input)
-            max_input = float(max_input)
-            filters[col] = ((min_input, max_input), col_temp)
-        except:
-            st.warning(f"Valori non validi per {col}, usare numeri validi.")
-        continue
-
-    # Filtri standard per altre colonne numeriche
-    if col_temp.notnull().sum() >= 2:
-        min_val = float(col_temp.min(skipna=True))
-        max_val = float(col_temp.max(skipna=True))
-        if pd.notna(min_val) and pd.notna(max_val) and min_val != max_val:
-            selected_range = st.slider(
-                f"Seleziona range per {col}",
-                min_val, max_val,
-                (min_val, max_val),
-                step=0.01,
-                key=f"{col}_slider"
-            )
-            if selected_range != (min_val, max_val):
-                filters[col] = (selected_range, col_temp)
-    else:
-        unique_vals = df[col].dropna().unique().tolist()
-        if len(unique_vals) > 0:
-            selected_val = st.selectbox(
-                f"Filtra per {col} (opzionale)",
-                ["Tutti"] + [str(v) for v in unique_vals],
-                key=f"{col}_select"
-            )
-            if selected_val != "Tutti":
-                filters[col] = selected_val
-
-# --- APPLICA FILTRI ---
+# --- Applica filtri ---
 filtered_df = df.copy()
-active_filters = False
-
 for col, val in filters.items():
-    active_filters = True
-    if col in special_gol_cols:
-        min_t, max_t = val
+    if col in ["odd_home", "odd_away", "odd_draw"]:
         filtered_df = filtered_df[
-            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) >= min_t) &
-            (pd.to_numeric(filtered_df[col], errors='coerce').fillna(999) <= max_t)
+            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
         ]
-    elif isinstance(val, tuple) and isinstance(val[0], (float, int)):
-        range_vals, col_temp = val
-        mask = (col_temp >= range_vals[0]) & (col_temp <= range_vals[1])
-        filtered_df = filtered_df[mask.fillna(True)]
-    else:
-        filtered_df = filtered_df[filtered_df[col].astype(str) == str(val)]
+    elif col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
+                 "primo_gol_away", "secondo_gol_away", "terzo_gol_away"]:
+        filtered_df = filtered_df[
+            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        ]
 
-if not active_filters:
+if filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
 
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df)
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- ANALISI RISULTATI ---
+# --- FUNZIONE DISTRIBUZIONE ---
 def mostra_distribuzione(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
@@ -156,7 +92,6 @@ def mostra_distribuzione(df, col_risultato, titolo):
         "2-0", "2-1", "2-2", "2-3",
         "3-0", "3-1", "3-2", "3-3"
     ]
-
     def classifica_risultato(ris):
         home, away = map(int, ris.split("-"))
         if ris in risultati_interessanti:
@@ -168,16 +103,17 @@ def mostra_distribuzione(df, col_risultato, titolo):
         else:
             return "Altro pareggio"
 
-    df[f"{col_risultato}_classificato"] = df[col_risultato].apply(classifica_risultato)
-
-    st.subheader(f"Distribuzione {titolo}")
-    distribuzione = df[f"{col_risultato}_classificato"].value_counts().reset_index()
+    df[f"{col_risultato}_class"] = df[col_risultato].apply(classifica_risultato)
+    distribuzione = df[f"{col_risultato}_class"].value_counts().reset_index()
     distribuzione.columns = ["Risultato", "Conteggio"]
     distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df) * 100).round(2)
-    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(
+        lambda x: round(100/x, 2) if x > 0 else "-"
+    )
+    st.subheader(f"Distribuzione {titolo}")
     st.table(distribuzione)
 
-    # WinRate 1X2
+    # Winrate 1X2
     count_1 = distribuzione[distribuzione["Risultato"].str.contains("casa vince")].Conteggio.sum() + \
               distribuzione[distribuzione["Risultato"].isin(["1-0","2-0","2-1","3-0","3-1","3-2"])].Conteggio.sum()
     count_2 = distribuzione[distribuzione["Risultato"].str.contains("ospite vince")].Conteggio.sum() + \
@@ -186,56 +122,32 @@ def mostra_distribuzione(df, col_risultato, titolo):
               distribuzione[distribuzione["Risultato"].isin(["0-0","1-1","2-2","3-3"])].Conteggio.sum()
 
     totale = len(df)
-    winrate = [
-        round((count_1/totale)*100,2),
-        round((count_x/totale)*100,2),
-        round((count_2/totale)*100,2)
-    ]
-    odd_minime = [round(100/w,2) if w>0 else "-" for w in winrate]
-
-    winrate_df = pd.DataFrame({
+    winrate = [round((count_1/totale)*100,2), round((count_x/totale)*100,2), round((count_2/totale)*100,2)]
+    st.table(pd.DataFrame({
         "Esito": ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)"],
         "Conteggio": [count_1, count_x, count_2],
         "WinRate %": winrate,
-        "Odd Minima": odd_minime
-    })
-    st.subheader(f"WinRate {titolo}")
-    st.table(winrate_df)
+        "Odd Minima": [round(100/w,2) if w > 0 else "-" for w in winrate]
+    }))
 
-# --- DISTRIBUZIONI FT & HT ---
+# --- STATISTICHE ---
 if not filtered_df.empty:
     mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
     mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
 
-# --- CALCOLO BTTS & OVER GOALS ---
-if not filtered_df.empty:
-    temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
-    temp_ft = temp_ft.replace("", np.nan).dropna()
-    temp_ft = temp_ft.astype(int)
-
-    filtered_df["home_g_ft"] = temp_ft[0]
-    filtered_df["away_g_ft"] = temp_ft[1]
+    # BTTS & Over
+    temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True).astype(int)
+    filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
     filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
 
-    total_games = len(filtered_df)
-
-    # BTTS
-    btts_count = len(filtered_df[(filtered_df["home_g_ft"] > 0) & (filtered_df["away_g_ft"] > 0)])
-    perc_btts = round(btts_count / total_games * 100, 2) if total_games > 0 else 0
-    odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
     st.subheader("BTTS (Both Teams To Score)")
-    st.write(f"Partite BTTS SI: {btts_count}")
-    st.write(f"Percentuale BTTS SI: {perc_btts}%")
-    st.write(f"Odd Minima: {odd_btts}")
+    btts = (filtered_df["home_g_ft"] > 0) & (filtered_df["away_g_ft"] > 0)
+    st.write(f"Partite BTTS SI: {btts.sum()} ({round(btts.mean()*100,2)}%)")
 
-    # Over FT
-    thresholds = [0.5, 1.5, 2.5, 3.5, 4.5]
-    over_data = []
-    for t in thresholds:
-        count_over = (filtered_df["tot_goals_ft"] > t).sum()
-        perc_over = round(count_over / total_games * 100, 2) if total_games > 0 else 0
-        odd_min = round(100 / perc_over, 2) if perc_over > 0 else "-"
-        over_data.append([f"Over FT {t}", count_over, perc_over, odd_min])
-    over_df = pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
     st.subheader("Over Goals (FT)")
-    st.table(over_df)
+    over_data = []
+    for t in [0.5, 1.5, 2.5, 3.5, 4.5]:
+        count = (filtered_df["tot_goals_ft"] > t).sum()
+        perc = round((count / len(filtered_df)) * 100, 2)
+        over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
