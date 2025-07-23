@@ -194,3 +194,29 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+    # --- FIRST TO SCORE ---
+    if "home_primo_gol" in filtered_df.columns and "away_primo_gol" in filtered_df.columns:
+        def calcola_first_to_score(row):
+            h = pd.to_numeric(row["home_primo_gol"], errors="coerce")
+            a = pd.to_numeric(row["away_primo_gol"], errors="coerce")
+            if pd.isna(h) and pd.isna(a):
+                return "Nessuno"
+            if pd.isna(a) or (not pd.isna(h) and h < a):
+                return "Home"
+            if pd.isna(h) or (not pd.isna(a) and a < h):
+                return "Away"
+            return "Nessuno"
+
+        filtered_df["first_to_score"] = filtered_df.apply(calcola_first_to_score, axis=1)
+        valid_ft = filtered_df[filtered_df["first_to_score"] != "Nessuno"]
+
+        st.subheader("First to Score")
+        if not valid_ft.empty:
+            fts = valid_ft["first_to_score"].value_counts().reset_index()
+            fts.columns = ["First to Score", "Conteggio"]
+            fts["Percentuale %"] = (fts["Conteggio"] / len(valid_ft) * 100).round(2)
+            fts["Odd Minima"] = fts["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+            st.table(fts)
+        else:
+            st.write("Nessuna partita valida per il calcolo del First to Score.")
