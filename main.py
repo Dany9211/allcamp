@@ -46,19 +46,16 @@ special_gol_cols = [
     "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
 ]
 
-st.markdown("### Filtri Timing Gol")
 for col in special_gol_cols:
     if col in df.columns:
-        activate = st.checkbox(f"Attiva filtro su {col.replace('_', ' ').capitalize()}", key=f"{col}_active")
-        if activate:
-            selected_timing = st.selectbox(
-                f"Timing {col.replace('_', ' ').capitalize()}",
-                timing_options,
-                key=col
-            )
-            if selected_timing != "Tutti":
-                min_t, max_t = map(int, selected_timing.split('-'))
-                filters[col] = (min_t, max_t)
+        selected_timing = st.selectbox(
+            f"Timing {col.replace('_', ' ').capitalize()}",
+            timing_options,
+            key=col
+        )
+        if selected_timing != "Tutti":
+            min_t, max_t = map(int, selected_timing.split('-'))
+            filters[col] = (min_t, max_t)
 
 # --- COLONNE DA ESCLUDERE ---
 exclude_columns = [
@@ -73,16 +70,11 @@ exclude_columns = [
     "quarto_gol_away", "quinto_gol_away"
 ]
 
-st.markdown("### Filtri Quote e Altri")
 # --- FILTRI STANDARD ---
 for col in df.columns:
     if col.lower() in exclude_columns or col in special_gol_cols:
         continue
     if col.lower() == "id" or "minutaggio" in col.lower() or col.lower() == "data":
-        continue
-
-    activate = st.checkbox(f"Attiva filtro per {col}", key=f"{col}_active")
-    if not activate:
         continue
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
@@ -92,8 +84,8 @@ for col in df.columns:
         min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
         max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
         st.write(f"**Filtro per {col}**")
-        min_input = st.text_input(f"Min {col}", str(min_val), key=f"{col}_min")
-        max_input = st.text_input(f"Max {col}", str(max_val), key=f"{col}_max")
+        min_input = st.text_input(f"Min {col}", str(min_val))
+        max_input = st.text_input(f"Max {col}", str(max_val))
         try:
             min_input = float(min_input)
             max_input = float(max_input)
@@ -108,11 +100,10 @@ for col in df.columns:
         max_val = float(col_temp.max(skipna=True))
         if pd.notna(min_val) and pd.notna(max_val) and min_val != max_val:
             selected_range = st.slider(
-                f"Seleziona range per {col}",
+                f"Filtro per {col}",
                 min_val, max_val,
                 (min_val, max_val),
-                step=0.01,
-                key=f"{col}_slider"
+                step=0.01
             )
             filters[col] = (selected_range, col_temp)
     else:
@@ -120,8 +111,7 @@ for col in df.columns:
         if len(unique_vals) > 0:
             selected_val = st.selectbox(
                 f"Filtra per {col} (opzionale)",
-                ["Tutti"] + [str(v) for v in unique_vals],
-                key=f"{col}_select"
+                ["Tutti"] + [str(v) for v in unique_vals]
             )
             if selected_val != "Tutti":
                 filters[col] = selected_val
