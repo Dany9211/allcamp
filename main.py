@@ -83,7 +83,7 @@ for col in df.columns:
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
 
-    # Filtro speciale per odd_home, odd_away, odd_draw (input min e max)
+    # Filtro speciale per odd_home, odd_away, odd_draw (input min e max invece di slider)
     if col.lower() in ["odd_home", "odd_away", "odd_draw"]:
         min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
         max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
