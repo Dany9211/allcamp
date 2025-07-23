@@ -79,10 +79,11 @@ for col in df.columns:
 
     col_temp = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
 
-    # Filtro speciale per odd_home, odd_away, odd_draw
+    # Filtro speciale per odd_home, odd_away, odd_draw (input min e max)
     if col.lower() in ["odd_home", "odd_away", "odd_draw"]:
         min_val = float(col_temp.min(skipna=True)) if col_temp.notnull().sum() > 0 else 0
         max_val = float(col_temp.max(skipna=True)) if col_temp.notnull().sum() > 0 else 10
+        st.write(f"**Filtro per {col}**")
         min_input = st.text_input(f"Min {col}", str(min_val))
         max_input = st.text_input(f"Max {col}", str(max_val))
         try:
