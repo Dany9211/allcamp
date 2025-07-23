@@ -33,13 +33,12 @@ if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
 
 filters = {}
 
-# --- Timing predefinito per gol ---
+# --- Timing predefinito per gol (solo primo, secondo, terzo - home e away) ---
 timing_options = [
     "Tutti", "0-5", "6-10", "0-10", "11-20", "21-30", "31-39",
     "40-45", "46-55", "56-65", "66-75", "76-85", "76-90", "85-90"
 ]
 
-# Colonne per i gol, inclusi primo_gol_away
 special_gol_cols = [
     "primo_gol_home", "secondo_gol_home", "terzo_gol_home",
     "primo_gol_away", "secondo_gol_away", "terzo_gol_away"
