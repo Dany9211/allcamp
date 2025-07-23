@@ -98,25 +98,28 @@ for col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
             min_t, max_t = map(int, timing_choice.split('-'))
             timing_filters[col] = (min_t, max_t)
 
+# --- PULSANTE RESET FILTRI ---
+if st.sidebar.button("🔄 Reset Filtri"):
+    filters = {}
+    timing_filters = {}
+    st.experimental_rerun()
+
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
 
 for col, val in filters.items():
     if col in ["odd_home", "odd_away", "odd_draw", "odd_over_2_5"]:
-        filtered_df = filtered_df[
-            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
-        ]
+        mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        filtered_df = filtered_df[mask.fillna(True)]
     elif col == "giornata":
-        filtered_df = filtered_df[
-            pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
-        ]
+        mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
+        filtered_df = filtered_df[mask.fillna(True)]
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
 
 for col, (min_t, max_t) in timing_filters.items():
-    filtered_df = filtered_df[
-        pd.to_numeric(filtered_df[col], errors="coerce").between(min_t, max_t)
-    ]
+    mask = pd.to_numeric(filtered_df[col], errors="coerce").between(min_t, max_t)
+    filtered_df = filtered_df[mask.fillna(True)]
 
 if filters == {} and timing_filters == {}:
     st.info("Nessun filtro attivo: vengono mostrati tutti i risultati.")
@@ -125,7 +128,7 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- FUNZIONI STATISTICHE ---
+# --- FUNZIONE DISTRIBUZIONE ---
 def mostra_distribuzione(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
