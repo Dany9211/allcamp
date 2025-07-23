@@ -100,9 +100,8 @@ for col in ["primo_gol_home", "secondo_gol_home", "terzo_gol_home",
 
 # --- PULSANTE RESET FILTRI ---
 if st.sidebar.button("🔄 Reset Filtri"):
-    filters = {}
-    timing_filters = {}
-    st.experimental_rerun()
+    st.session_state.clear()
+    st.rerun()
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
