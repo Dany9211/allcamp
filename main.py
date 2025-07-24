@@ -195,6 +195,39 @@ def mostra_distribuzione(df, col_risultato, titolo):
     plot_distribuzione(df, col_risultato, titolo)
     plot_winrate(winrate)
 
+# --- DISTRIBUZIONE GOL PER INTERVALLO ---
+def distribuzione_gol_timing(df):
+    home_cols = [c for c in df.columns if "home_" in c and "gol" in c]
+    away_cols = [c for c in df.columns if "away_" in c and "gol" in c]
+
+    all_goals = pd.concat([df[home_cols], df[away_cols]], axis=1)
+    goals_list = pd.to_numeric(all_goals.values.ravel(), errors="coerce")
+    goals_list = goals_list[(~np.isnan(goals_list)) & (goals_list > 0)]
+
+    if len(goals_list) == 0:
+        st.warning("Nessun dato sui gol disponibile per il calcolo del timing.")
+        return
+
+    bins = [(1,15), (16,30), (31,45), (46,60), (61,75), (76,90)]
+    timing_counts = []
+    total_goals = len(goals_list)
+
+    for low, high in bins:
+        count = ((goals_list >= low) & (goals_list <= high)).sum()
+        perc = round((count / total_goals) * 100, 2)
+        timing_counts.append([f"{low}-{high}", count, perc])
+
+    df_timing = pd.DataFrame(timing_counts, columns=["Intervallo Minuti", "Numero Gol", "Percentuale %"])
+
+    st.subheader("Distribuzione Gol per Timing (Home + Away)")
+    st.table(df_timing)
+
+    fig, ax = plt.subplots()
+    ax.bar(df_timing["Intervallo Minuti"], df_timing["Percentuale %"])
+    ax.set_title("Percentuale di Gol per Intervallo")
+    ax.set_ylabel("%")
+    st.pyplot(fig)
+
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
@@ -220,9 +253,11 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     over_df = pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
     st.table(over_df)
 
-    # --- GRAFICO OVER ---
     fig, ax = plt.subplots()
     ax.bar(over_df["Mercato"], over_df["Percentuale %"])
     ax.set_title("Percentuali Over Goals (FT)")
     ax.set_ylabel("%")
     st.pyplot(fig)
+
+    # --- Distribuzione Gol per Timing ---
+    distribuzione_gol_timing(filtered_df)
