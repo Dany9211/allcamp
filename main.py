@@ -135,36 +135,29 @@ st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
 # --- FUNZIONE DISTRIBUZIONE ---
 def mostra_distribuzione(df, col_risultato, titolo):
-    risultati_interessanti = [
-        "0-0", "0-1", "0-2", "0-3",
-        "1-0", "1-1", "1-2", "1-3",
-        "2-0", "2-1", "2-2", "2-3",
-        "3-0", "3-1", "3-2", "3-3"
-    ]
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
+    df_valid = df_valid.copy()
+
     def classifica_risultato(ris):
         try:
             home, away = map(int, ris.split("-"))
         except:
             return "Altro"
-        if ris in risultati_interessanti:
-            return ris
         if home > away:
-            return "Altro risultato casa vince"
+            return "Vittoria Casa"
         elif home < away:
-            return "Altro risultato ospite vince"
+            return "Vittoria Ospite"
         else:
-            return "Altro pareggio"
+            return "Pareggio"
 
-    df[f"{col_risultato}_class"] = df[col_risultato].apply(classifica_risultato)
-    distribuzione = df[f"{col_risultato}_class"].value_counts().reset_index()
-    distribuzione.columns = ["Risultato", "Conteggio"]
-    distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df) * 100).round(2)
-    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(
-        lambda x: round(100/x, 2) if x > 0 else "-"
-    )
+    df_valid[f"{col_risultato}_class"] = df_valid[col_risultato].apply(classifica_risultato)
+    stats = df_valid[f"{col_risultato}_class"].value_counts().reset_index()
+    stats.columns = ["Esito", "Conteggio"]
+    stats["Percentuale %"] = (stats["Conteggio"] / len(df_valid) * 100).round(2)
+    stats["Odd Minima"] = stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
 
-    st.subheader(f"Distribuzione {titolo}")
-    st.table(distribuzione)
+    st.subheader(f"WinRate {titolo}")
+    st.table(stats)
 
 # --- OVER HT ---
 def calcola_over_ht(df):
