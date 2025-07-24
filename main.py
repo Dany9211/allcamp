@@ -254,7 +254,6 @@ def calcola_media_gol(df):
     media_home_ft = df["home_g_ft"].mean() if "home_g_ft" in df else np.nan
     media_away_ft = df["away_g_ft"].mean() if "away_g_ft" in df else np.nan
 
-    # Secondo tempo (SH)
     media_home_sh = media_home_ft - media_home_ht if not np.isnan(media_home_ft) else np.nan
     media_away_sh = media_away_ft - media_away_ht if not np.isnan(media_away_ft) else np.nan
 
@@ -270,6 +269,50 @@ def calcola_media_gol(df):
     st.write(f"**Totale Medio Gol FT:** {round(media_home_ft + media_away_ft, 2)}")
     st.write(f"**Totale Medio Gol SH:** {round(media_home_sh + media_away_sh, 2)}")
 
+# --- CLEAN SHEET ---
+def calcola_clean_sheet(df):
+    st.subheader("Clean Sheet")
+    cs_home = (df["away_g_ft"] == 0).sum()
+    cs_away = (df["home_g_ft"] == 0).sum()
+    perc_home = round(cs_home / len(df) * 100, 2) if len(df) > 0 else 0
+    perc_away = round(cs_away / len(df) * 100, 2) if len(df) > 0 else 0
+    cs_df = pd.DataFrame({
+        "": ["Home", "Away"],
+        "Clean Sheet": [cs_home, cs_away],
+        "Percentuale %": [perc_home, perc_away]
+    })
+    st.table(cs_df)
+
+# --- GOL NEGLI ULTIMI 15 MINUTI ---
+def gol_ultimi_15(df):
+    st.subheader("Gol negli Ultimi 15 Minuti (76-90+)")
+    cond = (
+        (df[["primo_gol_home_", "secondo_gol_home", "terzo_gol_home", "quarto_gol_home", "quinto_gol_home"]] >= 76).any(axis=1) |
+        (df[["primo_gol_away", "secondo_gol_away", "terzo_gol_away", "quarto_gol_away", "quinto_gol_away"]] >= 76).any(axis=1)
+    )
+    count_last15 = cond.sum()
+    perc_last15 = round((count_last15 / len(df)) * 100, 2) if len(df) > 0 else 0
+    st.write(f"Partite con gol 76-90+: {count_last15} ({perc_last15}%)")
+
+# --- DISTRIBUZIONE GOL PER INTERVALLI ---
+def distribuzione_gol(df):
+    st.subheader("Distribuzione Gol per Fascia Oraria (Home + Away)")
+    intervalli = [(1,15), (16,30), (31,45), (46,60), (61,75), (76,90)]
+    counts = []
+    for start, end in intervalli:
+        mask = (
+            (df[["primo_gol_home_", "secondo_gol_home", "terzo_gol_home", "quarto_gol_home", "quinto_gol_home"]] >= start) &
+            (df[["primo_gol_home_", "secondo_gol_home", "terzo_gol_home", "quarto_gol_home", "quinto_gol_home"]] <= end)
+        ).sum().sum() + (
+            (df[["primo_gol_away", "secondo_gol_away", "terzo_gol_away", "quarto_gol_away", "quinto_gol_away"]] >= start) &
+            (df[["primo_gol_away", "secondo_gol_away", "terzo_gol_away", "quarto_gol_away", "quinto_gol_away"]] <= end)
+        ).sum().sum()
+        counts.append((f"{start}-{end}", mask))
+    total = sum(c[1] for c in counts)
+    dist = pd.DataFrame([(i[0], i[1], round(i[1]/total*100, 2) if total > 0 else 0) for i in counts],
+                        columns=["Intervallo Minuti", "Numero Gol", "Percentuale %"])
+    st.table(dist)
+
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
@@ -283,6 +326,9 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     calcola_btts(filtered_df)
     calcola_over_ht(filtered_df)
     calcola_media_gol(filtered_df)
+    calcola_clean_sheet(filtered_df)
+    gol_ultimi_15(filtered_df)
+    distribuzione_gol(filtered_df)
 
     st.subheader("Over Goals (FT)")
     over_data = []
