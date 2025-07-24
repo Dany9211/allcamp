@@ -133,49 +133,64 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- FUNZIONE DISTRIBUZIONE ---
-def mostra_distribuzione(df, col_risultato, titolo):
+# --- FUNZIONI PER WINRATE ---
+def calcola_winrate(df, col_risultato):
     df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
-    df_valid = df_valid.copy()
-
-    def classifica_risultato(ris):
+    risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
+    for ris in df_valid[col_risultato]:
         try:
             home, away = map(int, ris.split("-"))
+            if home > away:
+                risultati["1 (Casa)"] += 1
+            elif home < away:
+                risultati["2 (Trasferta)"] += 1
+            else:
+                risultati["X (Pareggio)"] += 1
         except:
-            return "Altro"
-        if home > away:
-            return "Vittoria Casa"
-        elif home < away:
-            return "Vittoria Ospite"
-        else:
-            return "Pareggio"
+            continue
+    totale = len(df_valid)
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale) * 100, 2) if totale > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    return stats, totale
 
-    df_valid[f"{col_risultato}_class"] = df_valid[col_risultato].apply(classifica_risultato)
-    stats = df_valid[f"{col_risultato}_class"].value_counts().reset_index()
-    stats.columns = ["Esito", "Conteggio"]
-    stats["Percentuale %"] = (stats["Conteggio"] / len(df_valid) * 100).round(2)
-    stats["Odd Minima"] = stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-
-    st.subheader(f"WinRate {titolo}")
-    st.table(stats)
-
-# --- OVER HT ---
-def calcola_over_ht(df):
-    if "risultato_ht" not in df.columns:
+def mostra_winrate_combinato(df):
+    if "risultato_ht" not in df.columns or "risultato_ft" not in df.columns:
+        st.warning("Colonne risultato_ht o risultato_ft mancanti.")
         return
-    temp_ht = df["risultato_ht"].str.split("-", expand=True)
-    temp_ht = temp_ht.apply(pd.to_numeric, errors="coerce").fillna(0)
-    df["tot_goals_ht"] = temp_ht[0] + temp_ht[1]
+    
+    stats_ht, totale_ht = calcola_winrate(df, "risultato_ht")
+    stats_ft, totale_ft = calcola_winrate(df, "risultato_ft")
 
-    total = len(df)
-    results = []
-    for threshold in [0.5, 1.5, 2.5]:
-        count = (df["tot_goals_ht"] > threshold).sum()
-        perc = round((count / total) * 100, 2) if total > 0 else 0
-        results.append([f"Over HT {threshold}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+    combined_data = []
+    for i in range(3):
+        combined_data.append([
+            stats_ft[i][0], 
+            stats_ht[i][1], stats_ht[i][2], stats_ht[i][3], 
+            stats_ft[i][1], stats_ft[i][2], stats_ft[i][3]
+        ])
 
-    st.subheader("Percentuali Over HT")
-    st.table(pd.DataFrame(results, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+    df_combined = pd.DataFrame(combined_data, columns=[
+        "Esito",
+        "Conteggio HT", "WinRate HT %", "Odd Minima HT",
+        "Conteggio FT", "WinRate FT %", "Odd Minima FT"
+    ])
+
+    st.subheader("WinRate Combinato (HT & FT)")
+    st.write(f"Totale partite (HT): {totale_ht} - Totale partite (FT): {totale_ft}")
+    st.table(df_combined)
+
+# --- RISULTATI ESATTI ---
+def mostra_risultati_esatti(df, col_risultato, titolo):
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
+    risultati = df_valid[col_risultato].value_counts().reset_index()
+    risultati.columns = [titolo, "Conteggio"]
+    risultati["Percentuale %"] = (risultati["Conteggio"] / len(df_valid) * 100).round(2)
+    risultati["Odd Minima"] = risultati["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    st.subheader(f"Risultati Esatti {titolo}")
+    st.table(risultati)
 
 # --- BTTS ---
 def calcola_btts(df):
@@ -195,10 +210,9 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
     filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
 
-    mostra_distribuzione(filtered_df, "risultato_ft", "Risultati Finali (FT)")
-    if "risultato_ht" in filtered_df.columns:
-        mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
-
+    mostra_winrate_combinato(filtered_df)
+    mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
+    mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
     calcola_btts(filtered_df)
 
     st.subheader("Over Goals (FT)")
@@ -208,5 +222,3 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-
-    calcola_over_ht(filtered_df)
