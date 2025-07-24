@@ -182,15 +182,39 @@ def mostra_winrate_combinato(df):
     st.write(f"Totale partite (HT): {totale_ht} - Totale partite (FT): {totale_ft}")
     st.table(df_combined)
 
-# --- RISULTATI ESATTI ---
+# --- RISULTATI ESATTI (filtrati) ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
-    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
-    risultati = df_valid[col_risultato].value_counts().reset_index()
-    risultati.columns = [titolo, "Conteggio"]
-    risultati["Percentuale %"] = (risultati["Conteggio"] / len(df_valid) * 100).round(2)
-    risultati["Odd Minima"] = risultati["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    risultati_interessanti = [
+        "0-0", "0-1", "0-2", "0-3",
+        "1-0", "1-1", "1-2", "1-3",
+        "2-0", "2-1", "2-2", "2-3",
+        "3-0", "3-1", "3-2", "3-3"
+    ]
+    
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))].copy()
+
+    def classifica_risultato(ris):
+        try:
+            home, away = map(int, ris.split("-"))
+        except:
+            return "Altro"
+        if ris in risultati_interessanti:
+            return ris
+        if home > away:
+            return "Altro risultato casa vince"
+        elif home < away:
+            return "Altro risultato ospite vince"
+        else:
+            return "Altro pareggio"
+
+    df_valid["classificato"] = df_valid[col_risultato].apply(classifica_risultato)
+    distribuzione = df_valid["classificato"].value_counts().reset_index()
+    distribuzione.columns = [titolo, "Conteggio"]
+    distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df_valid) * 100).round(2)
+    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
     st.subheader(f"Risultati Esatti {titolo}")
-    st.table(risultati)
+    st.table(distribuzione)
 
 # --- BTTS ---
 def calcola_btts(df):
@@ -203,6 +227,49 @@ def calcola_btts(df):
     st.write(f"Percentuale BTTS SI: {perc_btts}%")
     st.write(f"Odd Minima BTTS: {odd_btts}")
 
+# --- CALCOLO OVER HT ---
+def calcola_over_ht(df):
+    if "risultato_ht" not in df.columns:
+        st.warning("Colonna risultato_ht non trovata.")
+        return
+    
+    temp_ht = df["risultato_ht"].str.split("-", expand=True)
+    temp_ht = temp_ht.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
+    df["home_g_ht"], df["away_g_ht"] = temp_ht[0], temp_ht[1]
+    df["tot_goals_ht"] = df["home_g_ht"] + df["away_g_ht"]
+
+    st.subheader("Over Goals (HT)")
+    over_data = []
+    for t in [0.5, 1.5, 2.5]:
+        count = (df["tot_goals_ht"] > t).sum()
+        perc = round((count / len(df)) * 100, 2)
+        over_data.append([f"Over {t} HT", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+# --- MEDIA GOL ---
+def calcola_media_gol(df):
+    st.subheader("Media Gol (HT, FT, SH)")
+    media_home_ht = df["home_g_ht"].mean() if "home_g_ht" in df else np.nan
+    media_away_ht = df["away_g_ht"].mean() if "away_g_ht" in df else np.nan
+    media_home_ft = df["home_g_ft"].mean() if "home_g_ft" in df else np.nan
+    media_away_ft = df["away_g_ft"].mean() if "away_g_ft" in df else np.nan
+
+    # Secondo tempo (SH)
+    media_home_sh = media_home_ft - media_home_ht if not np.isnan(media_home_ft) else np.nan
+    media_away_sh = media_away_ft - media_away_ht if not np.isnan(media_away_ft) else np.nan
+
+    media_df = pd.DataFrame({
+        "": ["Home", "Away"],
+        "HT": [round(media_home_ht, 2), round(media_away_ht, 2)],
+        "FT": [round(media_home_ft, 2), round(media_away_ft, 2)],
+        "SH": [round(media_home_sh, 2), round(media_away_sh, 2)]
+    })
+
+    st.table(media_df)
+    st.write(f"**Totale Medio Gol HT:** {round(media_home_ht + media_away_ht, 2)}")
+    st.write(f"**Totale Medio Gol FT:** {round(media_home_ft + media_away_ft, 2)}")
+    st.write(f"**Totale Medio Gol SH:** {round(media_home_sh + media_away_sh, 2)}")
+
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
@@ -214,6 +281,8 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
     mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
     calcola_btts(filtered_df)
+    calcola_over_ht(filtered_df)
+    calcola_media_gol(filtered_df)
 
     st.subheader("Over Goals (FT)")
     over_data = []
