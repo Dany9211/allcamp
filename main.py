@@ -157,6 +157,10 @@ def calcola_winrate(df, col_risultato):
     return stats, totale
 
 def mostra_winrate_combinato(df):
+    if "risultato_ht" not in df.columns or "risultato_ft" not in df.columns:
+        st.warning("Colonne risultato_ht o risultato_ft mancanti.")
+        return
+    
     stats_ht, totale_ht = calcola_winrate(df, "risultato_ht")
     stats_ft, totale_ft = calcola_winrate(df, "risultato_ft")
 
@@ -186,6 +190,7 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
         "2-0", "2-1", "2-2", "2-3",
         "3-0", "3-1", "3-2", "3-3"
     ]
+    
     df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))].copy()
 
     def classifica_risultato(ris):
@@ -222,6 +227,25 @@ def calcola_btts(df):
     st.write(f"Percentuale BTTS SI: {perc_btts}%")
     st.write(f"Odd Minima BTTS: {odd_btts}")
 
+# --- CALCOLO OVER HT ---
+def calcola_over_ht(df):
+    if "risultato_ht" not in df.columns:
+        st.warning("Colonna risultato_ht non trovata.")
+        return
+    
+    temp_ht = df["risultato_ht"].str.split("-", expand=True)
+    temp_ht = temp_ht.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
+    df["home_g_ht"], df["away_g_ht"] = temp_ht[0], temp_ht[1]
+    df["tot_goals_ht"] = df["home_g_ht"] + df["away_g_ht"]
+
+    st.subheader("Over Goals (HT)")
+    over_data = []
+    for t in [0.5, 1.5, 2.5]:
+        count = (df["tot_goals_ht"] > t).sum()
+        perc = round((count / len(df)) * 100, 2)
+        over_data.append([f"Over {t} HT", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
 # --- MEDIA GOL ---
 def calcola_media_gol(df):
     st.subheader("Media Gol (HT, FT, SH)")
@@ -230,6 +254,7 @@ def calcola_media_gol(df):
     media_home_ft = df["home_g_ft"].mean() if "home_g_ft" in df else np.nan
     media_away_ft = df["away_g_ft"].mean() if "away_g_ft" in df else np.nan
 
+    # Secondo tempo (SH)
     media_home_sh = media_home_ft - media_home_ht if not np.isnan(media_home_ft) else np.nan
     media_away_sh = media_away_ft - media_away_ht if not np.isnan(media_away_ft) else np.nan
 
@@ -245,55 +270,35 @@ def calcola_media_gol(df):
     st.write(f"**Totale Medio Gol FT:** {round(media_home_ft + media_away_ft, 2)}")
     st.write(f"**Totale Medio Gol SH:** {round(media_home_sh + media_away_sh, 2)}")
 
-# --- CLEAN SHEET ---
-def calcola_clean_sheet(df):
-    st.subheader("Clean Sheet")
-    cs_home = (df["away_g_ft"] == 0).sum()
-    cs_away = (df["home_g_ft"] == 0).sum()
-    perc_home = round(cs_home / len(df) * 100, 2) if len(df) > 0 else 0
-    perc_away = round(cs_away / len(df) * 100, 2) if len(df) > 0 else 0
-    cs_df = pd.DataFrame({
-        "": ["Home", "Away"],
-        "Clean Sheet": [cs_home, cs_away],
-        "Percentuale %": [perc_home, perc_away]
-    })
-    st.table(cs_df)
-
-# --- GOL NEGLI ULTIMI 15 MINUTI ---
-def gol_ultimi_15(df):
-    st.subheader("Gol negli Ultimi 15 Minuti (76-90+)")
-    cond = (
-        (df[["primo_gol_home_", "secondo_gol_home", "terzo_gol_home", "quarto_gol_home", "quinto_gol_home"]] >= 76).any(axis=1) |
-        (df[["primo_gol_away", "secondo_gol_away", "terzo_gol_away", "quarto_gol_away", "quinto_gol_away"]] >= 76).any(axis=1)
-    )
-    count_last15 = cond.sum()
-    perc_last15 = round((count_last15 / len(df)) * 100, 2) if len(df) > 0 else 0
-    st.write(f"Partite con gol 76-90+: {count_last15} ({perc_last15}%)")
-
-# --- TOP 5 RIMONTA ---
+# --- CALCOLO RIMONTA ---
 def calcola_rimonta(df):
     st.subheader("TOP 5 Squadre Home e Away che Recuperano (da svantaggio HT a non-sconfitta FT)")
 
-    # HOME
+    # --- Home ---
     home_df = df[df["gol_home_ht"] < df["gol_away_ht"]]
-    home_group = home_df.groupby("home_team").apply(
-        lambda x: (x["gol_home_ft"] >= x["gol_away_ft"]).sum() / len(x) * 100
-    ).sort_values(ascending=False)
-    top_home = home_group.head(5).reset_index()
-    top_home.columns = ["Home Team", "Winrate Recupero %"]
+    if not home_df.empty:
+        home_group = home_df.groupby("home_team").apply(
+            lambda x: (x["gol_home_ft"] >= x["gol_away_ft"]).sum() / len(x) * 100
+        ).sort_values(ascending=False)
+        top_home = home_group.head(5).reset_index()
+        top_home.columns = ["Home Team", "Winrate Recupero %"]
+        st.write("**Top 5 Home:**")
+        st.table(top_home)
+    else:
+        st.write("Nessuna squadra Home con svantaggio a HT nel dataset filtrato.")
 
-    # AWAY
+    # --- Away ---
     away_df = df[df["gol_away_ht"] < df["gol_home_ht"]]
-    away_group = away_df.groupby("away_team").apply(
-        lambda x: (x["gol_away_ft"] >= x["gol_home_ft"]).sum() / len(x) * 100
-    ).sort_values(ascending=False)
-    top_away = away_group.head(5).reset_index()
-    top_away.columns = ["Away Team", "Winrate Recupero %"]
-
-    st.write("**Top 5 Home:**")
-    st.table(top_home)
-    st.write("**Top 5 Away:**")
-    st.table(top_away)
+    if not away_df.empty:
+        away_group = away_df.groupby("away_team").apply(
+            lambda x: (x["gol_away_ft"] >= x["gol_home_ft"]).sum() / len(x) * 100
+        ).sort_values(ascending=False)
+        top_away = away_group.head(5).reset_index()
+        top_away.columns = ["Away Team", "Winrate Recupero %"]
+        st.write("**Top 5 Away:**")
+        st.table(top_away)
+    else:
+        st.write("Nessuna squadra Away con svantaggio a HT nel dataset filtrato.")
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
@@ -306,10 +311,8 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
     mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
     calcola_btts(filtered_df)
+    calcola_over_ht(filtered_df)
     calcola_media_gol(filtered_df)
-    calcola_clean_sheet(filtered_df)
-    gol_ultimi_15(filtered_df)
-    calcola_rimonta(filtered_df)
 
     st.subheader("Over Goals (FT)")
     over_data = []
@@ -318,3 +321,5 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         perc = round((count / len(filtered_df)) * 100, 2)
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+    calcola_rimonta(filtered_df)
