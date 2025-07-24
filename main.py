@@ -179,10 +179,16 @@ def distribuzione_gol_timing(df):
     bins = [(1,15), (16,30), (31,45), (46,60), (61,75), (76,90)]
     timing_counts = {f"{low}-{high}": 0 for (low, high) in bins}
 
-    for col in goal_cols:
-        if col in df.columns:
-            valori = pd.to_numeric(df[col], errors="coerce")
-            for val in valori:
+    for _, row in df.iterrows():
+        # Salta se primo gol home e away sono vuoti
+        first_home = pd.to_numeric(row.get("home_primo_gol", np.nan), errors="coerce")
+        first_away = pd.to_numeric(row.get("away_primo_gol", np.nan), errors="coerce")
+        if pd.isna(first_home) and pd.isna(first_away):
+            continue
+
+        for col in goal_cols:
+            if col in df.columns:
+                val = pd.to_numeric(row.get(col, np.nan), errors="coerce")
                 if pd.notna(val) and 1 <= val <= 90:
                     for (low, high) in bins:
                         if low <= val <= high:
@@ -206,13 +212,21 @@ def media_gol_ht_ft(df):
         media_home_ft = df["gol_home_ft"].mean()
         media_away_ft = df["gol_away_ft"].mean()
 
+        media_home_sh = media_home_ft - media_home_ht
+        media_away_sh = media_away_ft - media_away_ht
+
         data = [
             ["Media Gol Home HT", round(media_home_ht, 2)],
             ["Media Gol Away HT", round(media_away_ht, 2)],
+            ["Media Gol Home SH", round(media_home_sh, 2)],
+            ["Media Gol Away SH", round(media_away_sh, 2)],
             ["Media Gol Home FT", round(media_home_ft, 2)],
-            ["Media Gol Away FT", round(media_away_ft, 2)]
+            ["Media Gol Away FT", round(media_away_ft, 2)],
+            ["Totale Media Gol HT", round(media_home_ht + media_away_ht, 2)],
+            ["Totale Media Gol SH", round(media_home_sh + media_away_sh, 2)],
+            ["Totale Media Gol FT", round(media_home_ft + media_away_ft, 2)],
         ]
-        st.subheader("Medie Gol (HT e FT)")
+        st.subheader("Medie Gol (HT, SH, FT)")
         st.table(pd.DataFrame(data, columns=["Descrizione", "Media"]))
 
 # --- STATISTICHE ---
