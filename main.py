@@ -180,19 +180,17 @@ def distribuzione_gol_timing(df):
     timing_counts = {f"{low}-{high}": 0 for (low, high) in bins}
 
     for _, row in df.iterrows():
-        # Salta se primo gol home e away sono vuoti
         first_home = pd.to_numeric(row.get("home_primo_gol", np.nan), errors="coerce")
         first_away = pd.to_numeric(row.get("away_primo_gol", np.nan), errors="coerce")
         if pd.isna(first_home) and pd.isna(first_away):
             continue
 
         for col in goal_cols:
-            if col in df.columns:
-                val = pd.to_numeric(row.get(col, np.nan), errors="coerce")
-                if pd.notna(val) and 1 <= val <= 90:
-                    for (low, high) in bins:
-                        if low <= val <= high:
-                            timing_counts[f"{low}-{high}"] += 1
+            val = pd.to_numeric(row.get(col, np.nan), errors="coerce")
+            if pd.notna(val) and 1 <= val <= 90:
+                for (low, high) in bins:
+                    if low <= val <= high:
+                        timing_counts[f"{low}-{high}"] += 1
 
     total_goals = sum(timing_counts.values())
     rows = []
@@ -229,6 +227,26 @@ def media_gol_ht_ft(df):
         st.subheader("Medie Gol (HT, SH, FT)")
         st.table(pd.DataFrame(data, columns=["Descrizione", "Media"]))
 
+# --- OVER HT ---
+def calcola_over_ht(df):
+    if "risultato_ht" not in df.columns:
+        st.warning("Colonna risultato_ht non trovata.")
+        return
+
+    temp_ht = df["risultato_ht"].str.split("-", expand=True)
+    temp_ht = temp_ht.apply(pd.to_numeric, errors="coerce").fillna(0)
+    df["tot_goals_ht"] = temp_ht[0] + temp_ht[1]
+
+    total = len(df)
+    results = []
+    for threshold in [0.5, 1.5, 2.5]:
+        count = (df["tot_goals_ht"] > threshold).sum()
+        perc = round((count / total) * 100, 2) if total > 0 else 0
+        results.append([f"Over HT {threshold}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+
+    st.subheader("Percentuali Over HT")
+    st.table(pd.DataFrame(results, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
@@ -252,5 +270,6 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
+    calcola_over_ht(filtered_df)
     media_gol_ht_ft(filtered_df)
     distribuzione_gol_timing(filtered_df)
