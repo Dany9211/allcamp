@@ -182,7 +182,7 @@ def mostra_winrate_combinato(df):
     st.write(f"Totale partite (HT): {totale_ht} - Totale partite (FT): {totale_ft}")
     st.table(df_combined)
 
-# --- RISULTATI ESATTI (filtrati) ---
+# --- RISULTATI ESATTI ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
@@ -227,7 +227,7 @@ def calcola_btts(df):
     st.write(f"Percentuale BTTS SI: {perc_btts}%")
     st.write(f"Odd Minima BTTS: {odd_btts}")
 
-# --- CALCOLO OVER HT ---
+# --- OVER HT ---
 def calcola_over_ht(df):
     if "risultato_ht" not in df.columns:
         st.warning("Colonna risultato_ht non trovata.")
@@ -254,7 +254,6 @@ def calcola_media_gol(df):
     media_home_ft = df["home_g_ft"].mean() if "home_g_ft" in df else np.nan
     media_away_ft = df["away_g_ft"].mean() if "away_g_ft" in df else np.nan
 
-    # Secondo tempo (SH)
     media_home_sh = media_home_ft - media_home_ht if not np.isnan(media_home_ft) else np.nan
     media_away_sh = media_away_ft - media_away_ht if not np.isnan(media_away_ft) else np.nan
 
@@ -277,26 +276,30 @@ def calcola_rimonta(df):
     # --- Home ---
     home_df = df[df["gol_home_ht"] < df["gol_away_ht"]]
     if not home_df.empty:
-        home_group = home_df.groupby("home_team").apply(
-            lambda x: (x["gol_home_ft"] >= x["gol_away_ft"]).sum() / len(x) * 100
-        ).sort_values(ascending=False)
-        top_home = home_group.head(5).reset_index()
-        top_home.columns = ["Home Team", "Winrate Recupero %"]
+        home_stats = home_df.groupby("home_team").apply(
+            lambda x: pd.Series({
+                "Partite Svantaggio HT": len(x),
+                "Non Perse FT": (x["gol_home_ft"] >= x["gol_away_ft"]).sum(),
+                "Winrate Recupero %": round((x["gol_home_ft"] >= x["gol_away_ft"]).mean() * 100, 2)
+            })
+        ).sort_values("Winrate Recupero %", ascending=False).head(5)
         st.write("**Top 5 Home:**")
-        st.table(top_home)
+        st.table(home_stats.reset_index())
     else:
         st.write("Nessuna squadra Home con svantaggio a HT nel dataset filtrato.")
 
     # --- Away ---
     away_df = df[df["gol_away_ht"] < df["gol_home_ht"]]
     if not away_df.empty:
-        away_group = away_df.groupby("away_team").apply(
-            lambda x: (x["gol_away_ft"] >= x["gol_home_ft"]).sum() / len(x) * 100
-        ).sort_values(ascending=False)
-        top_away = away_group.head(5).reset_index()
-        top_away.columns = ["Away Team", "Winrate Recupero %"]
+        away_stats = away_df.groupby("away_team").apply(
+            lambda x: pd.Series({
+                "Partite Svantaggio HT": len(x),
+                "Non Perse FT": (x["gol_away_ft"] >= x["gol_home_ft"]).sum(),
+                "Winrate Recupero %": round((x["gol_away_ft"] >= x["gol_home_ft"]).mean() * 100, 2)
+            })
+        ).sort_values("Winrate Recupero %", ascending=False).head(5)
         st.write("**Top 5 Away:**")
-        st.table(top_away)
+        st.table(away_stats.reset_index())
     else:
         st.write("Nessuna squadra Away con svantaggio a HT nel dataset filtrato.")
 
