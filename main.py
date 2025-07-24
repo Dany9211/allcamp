@@ -172,31 +172,48 @@ def mostra_distribuzione(df, col_risultato, titolo):
 
 # --- DISTRIBUZIONE GOL PER INTERVALLO ---
 def distribuzione_gol_timing(df):
-    home_cols = [c for c in df.columns if "home_" in c and "gol" in c]
-    away_cols = [c for c in df.columns if "away_" in c and "gol" in c]
-
-    all_goals = pd.concat([df[home_cols], df[away_cols]], axis=1)
-
-    # Converte a numerico e filtra solo valori validi (1-90)
-    goals_list = pd.to_numeric(all_goals.values.ravel(), errors="coerce")
-    goals_list = goals_list[(~np.isnan(goals_list)) & (goals_list > 0) & (goals_list <= 90)]
-
-    if len(goals_list) == 0:
-        st.warning("Nessun dato sui gol valido per il calcolo del timing.")
-        return
-
+    goal_cols = [
+        "home_primo_gol", "home_secondo_gol", "home_terzo_gol", "home_quarto_gol", "home_quinto_gol",
+        "away_primo_gol", "away_secondo_gol", "away_terzo_gol", "away_quarto_gol", "away_quinto_gol"
+    ]
     bins = [(1,15), (16,30), (31,45), (46,60), (61,75), (76,90)]
-    timing_counts = []
-    total_goals = len(goals_list)
+    timing_counts = {f"{low}-{high}": 0 for (low, high) in bins}
 
-    for low, high in bins:
-        count = ((goals_list >= low) & (goals_list <= high)).sum()
-        perc = round((count / total_goals) * 100, 2)
-        timing_counts.append([f"{low}-{high}", count, perc])
+    for col in goal_cols:
+        if col in df.columns:
+            valori = pd.to_numeric(df[col], errors="coerce")
+            for val in valori:
+                if pd.notna(val) and 1 <= val <= 90:
+                    for (low, high) in bins:
+                        if low <= val <= high:
+                            timing_counts[f"{low}-{high}"] += 1
 
-    df_timing = pd.DataFrame(timing_counts, columns=["Intervallo Minuti", "Numero Gol", "Percentuale %"])
+    total_goals = sum(timing_counts.values())
+    rows = []
+    for intervallo, count in timing_counts.items():
+        perc = round((count / total_goals) * 100, 2) if total_goals > 0 else 0
+        rows.append([intervallo, count, perc])
+
+    df_timing = pd.DataFrame(rows, columns=["Intervallo Minuti", "Numero Gol", "Percentuale %"])
     st.subheader("Distribuzione Gol per Timing (Home + Away)")
     st.table(df_timing)
+
+# --- MEDIE GOL ---
+def media_gol_ht_ft(df):
+    if {"gol_home_ht", "gol_away_ht", "gol_home_ft", "gol_away_ft"}.issubset(df.columns):
+        media_home_ht = df["gol_home_ht"].mean()
+        media_away_ht = df["gol_away_ht"].mean()
+        media_home_ft = df["gol_home_ft"].mean()
+        media_away_ft = df["gol_away_ft"].mean()
+
+        data = [
+            ["Media Gol Home HT", round(media_home_ht, 2)],
+            ["Media Gol Away HT", round(media_away_ht, 2)],
+            ["Media Gol Home FT", round(media_home_ft, 2)],
+            ["Media Gol Away FT", round(media_away_ft, 2)]
+        ]
+        st.subheader("Medie Gol (HT e FT)")
+        st.table(pd.DataFrame(data, columns=["Descrizione", "Media"]))
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
@@ -209,7 +226,6 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     if "risultato_ht" in filtered_df.columns:
         mostra_distribuzione(filtered_df, "risultato_ht", "Risultati Primo Tempo (HT)")
 
-    # --- BTTS e Over ---
     st.subheader("BTTS (Both Teams To Score)")
     btts = (filtered_df["home_g_ft"] > 0) & (filtered_df["away_g_ft"] > 0)
     st.write(f"Partite BTTS SI: {btts.sum()} ({round(btts.mean()*100,2)}%)")
@@ -222,5 +238,5 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
-    # --- Distribuzione Gol per Timing ---
+    media_gol_ht_ft(filtered_df)
     distribuzione_gol_timing(filtered_df)
