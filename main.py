@@ -3,7 +3,7 @@ import psycopg2
 import pandas as pd
 import numpy as np
 
-st.set_page_config(page_title="Allcamp Viewer", layout="wide")
+st.set_page_config(page_title="Analisi Next Gol e stats live", layout="wide")
 st.title("Analisi Tabella allcamp")
 
 # --- Funzione connessione ---
