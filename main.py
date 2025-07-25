@@ -148,10 +148,9 @@ filtered_df["label_odds"] = filtered_df.apply(assegna_label_odds, axis=1)
 # --- ANALISI DAL MINUTO ---
 def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (da minuto A a B)")
-    minuto_range = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
+    start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
     risultato_corrente = st.selectbox("Risultato corrente al minuto iniziale", ["0-0", "1-0", "0-1", "1-1"])
 
-    start_min, end_min = minuto_range
     partite_target = []
     for _, row in df.iterrows():
         gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
@@ -209,8 +208,8 @@ def analizza_da_minuto(df):
     st.write(f"Partite BTTS SI: {count_btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
 
     # --- DISTRIBUZIONE GOL ---
-    st.subheader("Distribuzione Gol per Timeframe")
-    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+    st.subheader("Distribuzione Gol per Timeframe (solo range selezionato)")
+    intervalli = [(start_min, end_min)]
     risultati = []
     total_partite = len(df_target)
 
