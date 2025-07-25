@@ -196,11 +196,11 @@ def analizza_da_minuto(df):
     st.write("**FT:**")
     st.table(ft_winrate)
 
-    # --- Risultati Esatti HT & FT ---
+    # --- Risultati Esatti ---
     mostra_risultati_esatti(df_target, "risultato_ht", "HT")
     mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
-    # --- Over Goals ---
+    # --- Over Goals HT e FT ---
     temp_ht = df_target["risultato_ht"].str.split("-", expand=True).apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
     df_target["home_g_ht"], df_target["away_g_ht"] = temp_ht[0], temp_ht[1]
     df_target["tot_goals_ht"] = df_target["home_g_ht"] + df_target["away_g_ht"]
@@ -232,6 +232,18 @@ def analizza_da_minuto(df):
     odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
     st.subheader(f"BTTS SI - Partite: {len(df_target)}")
     st.write(f"BTTS SI: {count_btts} partite ({perc_btts}%) - Odd Minima: {odd_btts}")
+
+    # --- DISTRIBUZIONE GOL NEL RANGE ---
+    st.subheader(f"Statistiche nel range selezionato ({start_min}-{end_min}) - Partite: {len(df_target)}")
+    gol_range_stats = []
+    for t in [0.5, 1.5, 2.5, 3.5, 4.5]:
+        count = 0
+        for _, row in df_target.iterrows():
+            all_gol = [int(x) for x in str(row.get("minutaggio_gol", "") + ";" + row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+            count += 1 if sum(1 for g in all_gol if start_min <= g <= end_min) > t else 0
+        perc = round((count / len(df_target)) * 100, 2)
+        gol_range_stats.append([f"Over {t} (Range)", count, perc, round(100/perc, 2) if perc > 0 else "-"])
+    st.table(pd.DataFrame(gol_range_stats, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
     # --- Distribuzione Gol per Timeframe ---
     st.subheader(f"Distribuzione Gol per Timeframe - Partite: {len(df_target)}")
