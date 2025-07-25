@@ -152,14 +152,6 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
     st.table(distribuzione)
 
-# --- TOP 10 LEAGUE ---
-def mostra_top10_league(df):
-    if "league" in df.columns:
-        league_stats = df["league"].value_counts().head(10).reset_index()
-        league_stats.columns = ["League", "Conteggio"]
-        st.write("**Top 10 League:**")
-        st.table(league_stats)
-
 # --- ANALISI DAL MINUTO ---
 def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (da minuto A a B)")
@@ -204,7 +196,6 @@ def analizza_da_minuto(df):
     st.table(calcola_winrate(df_target, "risultato_ht"))
     st.write("**FT:**")
     st.table(calcola_winrate(df_target, "risultato_ft"))
-    mostra_top10_league(df_target)
 
     # --- Over/Under nel range ---
     st.subheader(f"Over Goals (Range {start_min}-{end_min})")
@@ -221,7 +212,6 @@ def analizza_da_minuto(df):
     odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
     st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
     st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
-    mostra_top10_league(df_target)
 
     # --- Distribuzione gol 0-90 ---
     st.subheader("Distribuzione Gol per Timeframe (0-90)")
@@ -238,7 +228,6 @@ def analizza_da_minuto(df):
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
     st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
-    mostra_top10_league(df_target)
 
 # --- ESECUZIONE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
