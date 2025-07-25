@@ -282,9 +282,16 @@ def calcola_rimonta(df):
                 "Non Perse FT": (x["gol_home_ft"] >= x["gol_away_ft"]).sum(),
                 "Winrate Recupero %": round((x["gol_home_ft"] >= x["gol_away_ft"]).mean() * 100, 2)
             })
-        ).sort_values("Winrate Recupero %", ascending=False).head(5)
-        st.write("**Top 5 Home:**")
-        st.table(home_stats.reset_index())
+        )
+
+        home_stats = home_stats[home_stats["Partite Svantaggio HT"] >= 10]
+        home_stats = home_stats.sort_values("Winrate Recupero %", ascending=False).head(5)
+
+        if not home_stats.empty:
+            st.write("**Top 5 Home:**")
+            st.table(home_stats.reset_index())
+        else:
+            st.write("Nessuna squadra Home con almeno 10 partite in svantaggio HT.")
     else:
         st.write("Nessuna squadra Home con svantaggio a HT nel dataset filtrato.")
 
@@ -297,9 +304,16 @@ def calcola_rimonta(df):
                 "Non Perse FT": (x["gol_away_ft"] >= x["gol_home_ft"]).sum(),
                 "Winrate Recupero %": round((x["gol_away_ft"] >= x["gol_home_ft"]).mean() * 100, 2)
             })
-        ).sort_values("Winrate Recupero %", ascending=False).head(5)
-        st.write("**Top 5 Away:**")
-        st.table(away_stats.reset_index())
+        )
+
+        away_stats = away_stats[away_stats["Partite Svantaggio HT"] >= 10]
+        away_stats = away_stats.sort_values("Winrate Recupero %", ascending=False).head(5)
+
+        if not away_stats.empty:
+            st.write("**Top 5 Away:**")
+            st.table(away_stats.reset_index())
+        else:
+            st.write("Nessuna squadra Away con almeno 10 partite in svantaggio HT.")
     else:
         st.write("Nessuna squadra Away con svantaggio a HT nel dataset filtrato.")
 
