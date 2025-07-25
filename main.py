@@ -149,7 +149,7 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df_valid) * 100).round(2)
     distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
 
-    st.subheader(f"Risultati Esatti {titolo}")
+    st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
     st.table(distribuzione)
 
 # --- LABEL ODDS ---
@@ -206,7 +206,7 @@ def analizza_da_minuto(df):
     mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
     # --- WINRATE HT & FT ---
-    st.subheader("WinRate HT e FT")
+    st.subheader(f"WinRate HT e FT ({len(df_target)} partite)")
     ht_winrate, _ = calcola_winrate(df_target, "risultato_ht")
     ft_winrate, _ = calcola_winrate(df_target, "risultato_ft")
     st.write("**HT:**")
@@ -223,23 +223,34 @@ def analizza_da_minuto(df):
     df_target["home_g_ft"], df_target["away_g_ft"] = temp_ft[0], temp_ft[1]
     df_target["tot_goals_ft"] = df_target["home_g_ft"] + df_target["away_g_ft"]
 
-    st.subheader("Over Goals HT e FT")
-    over_ht = [[f"Over {t} HT", (df_target["tot_goals_ht"] > t).sum(), round((df_target["tot_goals_ht"] > t).mean()*100, 2)] for t in [0.5, 1.5, 2.5]]
-    st.table(pd.DataFrame(over_ht, columns=["Mercato", "Conteggio", "Percentuale %"]))
+    st.subheader(f"Over Goals HT ({len(df_target)} partite)")
+    over_ht = []
+    for t in [0.5, 1.5, 2.5]:
+        count = (df_target["tot_goals_ht"] > t).sum()
+        perc = round((count / len(df_target)) * 100, 2)
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        over_ht.append([f"Over {t} HT", count, perc, odd_min])
+    st.table(pd.DataFrame(over_ht, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
-    over_ft = [[f"Over {t} FT", (df_target["tot_goals_ft"] > t).sum(), round((df_target["tot_goals_ft"] > t).mean()*100, 2)] for t in [0.5, 1.5, 2.5, 3.5, 4.5]]
-    st.table(pd.DataFrame(over_ft, columns=["Mercato", "Conteggio", "Percentuale %"]))
+    st.subheader(f"Over Goals FT ({len(df_target)} partite)")
+    over_ft = []
+    for t in [0.5, 1.5, 2.5, 3.5, 4.5]:
+        count = (df_target["tot_goals_ft"] > t).sum()
+        perc = round((count / len(df_target)) * 100, 2)
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        over_ft.append([f"Over {t} FT", count, perc, odd_min])
+    st.table(pd.DataFrame(over_ft, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
     btts = (df_target["home_g_ft"] > 0) & (df_target["away_g_ft"] > 0)
     count_btts = btts.sum()
     perc_btts = round(count_btts / len(df_target) * 100, 2)
     odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
-    st.subheader("BTTS SI")
-    st.write(f"Partite BTTS SI: {count_btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
+    st.subheader(f"BTTS SI ({len(df_target)} partite)")
+    st.write(f"BTTS SI: {count_btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
 
     # --- DISTRIBUZIONE GOL ---
-    st.subheader("Distribuzione Gol per Timeframe (solo range selezionato)")
-    intervalli = [(start_min, end_min)]
+    st.subheader(f"Distribuzione Gol per Timeframe ({len(df_target)} partite)")
+    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
     risultati = []
     total_partite = len(df_target)
 
@@ -251,9 +262,9 @@ def analizza_da_minuto(df):
             if any(start <= g <= end for g in gol_home + gol_away):
                 partite_con_gol += 1
         perc = round((partite_con_gol / total_partite) * 100, 2) if total_partite > 0 else 0
-        risultati.append([f"{start}-{end}", partite_con_gol, perc])
+        risultati.append([f"{start}-{end}", partite_con_gol, perc, round(100/perc, 2) if perc > 0 else "-"])
 
-    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %"]))
+    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 
 # --- ESECUZIONE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
