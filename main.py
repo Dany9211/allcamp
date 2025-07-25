@@ -119,6 +119,39 @@ def calcola_winrate(df, col_risultato):
         stats.append((esito, count, perc, odd_min))
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"]), totale
 
+# --- RISULTATI ESATTI ---
+def mostra_risultati_esatti(df, col_risultato, titolo):
+    risultati_interessanti = [
+        "0-0", "0-1", "0-2", "0-3",
+        "1-0", "1-1", "1-2", "1-3",
+        "2-0", "2-1", "2-2", "2-3",
+        "3-0", "3-1", "3-2", "3-3"
+    ]
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))].copy()
+
+    def classifica_risultato(ris):
+        try:
+            home, away = map(int, ris.split("-"))
+        except:
+            return "Altro"
+        if ris in risultati_interessanti:
+            return ris
+        if home > away:
+            return "Altro risultato casa vince"
+        elif home < away:
+            return "Altro risultato ospite vince"
+        else:
+            return "Altro pareggio"
+
+    df_valid["classificato"] = df_valid[col_risultato].apply(classifica_risultato)
+    distribuzione = df_valid["classificato"].value_counts().reset_index()
+    distribuzione.columns = [titolo, "Conteggio"]
+    distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df_valid) * 100).round(2)
+    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+    st.subheader(f"Risultati Esatti {titolo}")
+    st.table(distribuzione)
+
 # --- LABEL ODDS ---
 def assegna_label_odds(row):
     try:
@@ -168,12 +201,9 @@ def analizza_da_minuto(df):
     df_target = pd.DataFrame(partite_target)
     st.write(f"**Partite trovate:** {len(df_target)}")
 
-    # --- STATISTICHE LABEL ODDS ---
-    st.subheader("Distribuzione Label Odds")
-    label_dist = df_target["label_odds"].value_counts().reset_index()
-    label_dist.columns = ["Label Odds", "Conteggio"]
-    label_dist["Percentuale %"] = round(label_dist["Conteggio"] / len(df_target) * 100, 2)
-    st.table(label_dist)
+    # --- RISULTATI ESATTI HT E FT ---
+    mostra_risultati_esatti(df_target, "risultato_ht", "HT")
+    mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
     # --- WINRATE HT & FT ---
     st.subheader("WinRate HT e FT")
