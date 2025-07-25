@@ -156,7 +156,7 @@ def calcola_winrate(df, col_risultato):
 def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (range minuti)")
     minuto_range = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
-    risultati_possibili = sorted(set(["0-0", "1-0", "0-1", "1-1"]))
+    risultati_possibili = sorted(set(["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2"]))
     risultati_selezionati = st.multiselect("Seleziona risultati correnti", risultati_possibili, default=["0-0"])
 
     start_min, end_min = minuto_range
