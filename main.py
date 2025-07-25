@@ -304,45 +304,33 @@ def calcola_rimonta(df):
         st.write("Nessuna squadra Away con svantaggio a HT nel dataset filtrato.")
 
 # --- DISTRIBUZIONE GOL PER TIMEFRAME ---
-def calcola_distribuzione_gol(df):
-    st.subheader("Distribuzione Gol per Timing (Home + Away)")
+def distribuzione_gol_per_partita(df):
+    st.subheader("Distribuzione Gol per Timeframe (max 2 gol per fascia)")
+    intervalli = [(1, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+    risultati = []
 
-    timeframes = {
-        "1-15": (1, 15),
-        "16-30": (16, 30),
-        "31-45": (31, 45),
-        "46-60": (46, 60),
-        "61-75": (61, 75),
-        "76-90": (76, 90)
-    }
+    total_partite = len(df)
 
-    distribuzione = {k: 0 for k in timeframes.keys()}
-    totale_partite = len(df)
+    for (start, end) in intervalli:
+        partite_con_gol = 0
+        for _, row in df.iterrows():
+            # Gol Home
+            gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+            gol_home_in_range = [g for g in gol_home if start <= g <= end][:2]  # max 2 gol
 
-    for _, row in df.iterrows():
-        # Gol Home
-        home_goals = []
-        if pd.notna(row.get("minutaggio_gol")):
-            home_goals = [int(x) for x in str(row["minutaggio_gol"]).split(";") if x.isdigit()]
-        # Gol Away
-        away_goals = []
-        if pd.notna(row.get("minutaggio_gol_away")):
-            away_goals = [int(x) for x in str(row["minutaggio_gol_away"]).split(";") if x.isdigit()]
+            # Gol Away
+            gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+            gol_away_in_range = [g for g in gol_away if start <= g <= end][:2]  # max 2 gol
 
-        goals = sorted(home_goals + away_goals)
+            # Se c’è almeno un gol nel timeframe
+            if gol_home_in_range or gol_away_in_range:
+                partite_con_gol += 1
 
-        for timeframe, (start, end) in timeframes.items():
-            goals_in_tf = [g for g in goals if start <= g <= end]
-            distribuzione[timeframe] += min(len(goals_in_tf), 2)
+        perc = round((partite_con_gol / total_partite) * 100, 2) if total_partite > 0 else 0
+        risultati.append([f"{start}-{end}", partite_con_gol, perc])
 
-    # Percentuale calcolata su numero partite
-    df_distrib = pd.DataFrame({
-        "Intervallo Minuti": list(distribuzione.keys()),
-        "Numero Gol": list(distribuzione.values()),
-        "Percentuale %": [round((v / totale_partite) * 100, 2) for v in distribuzione.values()]
-    })
-
-    st.table(df_distrib)
+    df_ris = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %"])
+    st.table(df_ris)
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
@@ -366,5 +354,6 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
-    calcola_rimonta(filtered_df)
-    calcola_distribuzione_gol(filtered_df)
+    distribuzione_gol_per_partita(filtered_df)
+
+calcola_rimonta(filtered_df)
