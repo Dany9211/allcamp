@@ -151,33 +151,6 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
 
     st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
     st.table(distribuzione)
-    mostra_top10_league(df)
-
-# --- LABEL ODDS ---
-def assegna_label_odds(row):
-    try:
-        oh = float(str(row["odd_home"]).replace(",", "."))
-        oa = float(str(row["odd_away"]).replace(",", "."))
-    except:
-        return "N/A"
-
-    if oh <= 1.5:
-        return "Home strong fav"
-    elif 1.51 <= oh <= 2.0:
-        return "Home med fav"
-    elif 2.01 <= oh <= 2.5 and oa > 3.0:
-        return "Home small fav"
-    elif oa <= 1.5:
-        return "Away strong fav"
-    elif 1.51 <= oa <= 2.0:
-        return "Away med fav"
-    elif 2.01 <= oa <= 2.5 and oh > 3.0:
-        return "Away small fav"
-    elif oh < 3.0 and oa < 3.0:
-        return "Supercompetitive"
-    return "Altro"
-
-filtered_df["label_odds"] = filtered_df.apply(assegna_label_odds, axis=1)
 
 # --- TOP 10 LEAGUE ---
 def mostra_top10_league(df):
@@ -211,51 +184,47 @@ def analizza_da_minuto(df):
     df_target = pd.DataFrame(partite_target)
     st.write(f"**Partite trovate:** {len(df_target)}")
 
+    # --- Calcolo gol nel range ---
+    def conta_gol_range(row):
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        home_in_range = sum(1 for g in gol_home if start_min <= g <= end_min)
+        away_in_range = sum(1 for g in gol_away if start_min <= g <= end_min)
+        return home_in_range, away_in_range
+
+    df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
+    df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
+
+    # --- Risultati esatti e Winrate basati sul range ---
     mostra_risultati_esatti(df_target, "risultato_ht", "HT")
     mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
-    st.subheader(f"WinRate HT e FT ({len(df_target)} partite)")
+    st.subheader(f"WinRate (Range {start_min}-{end_min})")
     st.write("**HT:**")
     st.table(calcola_winrate(df_target, "risultato_ht"))
     st.write("**FT:**")
     st.table(calcola_winrate(df_target, "risultato_ft"))
     mostra_top10_league(df_target)
 
-    temp_ht = df_target["risultato_ht"].str.split("-", expand=True).apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
-    df_target["tot_goals_ht"] = temp_ht[0] + temp_ht[1]
-
-    temp_ft = df_target["risultato_ft"].str.split("-", expand=True).apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
-    df_target["tot_goals_ft"] = temp_ft[0] + temp_ft[1]
-
-    st.subheader(f"Over Goals HT ({len(df_target)} partite)")
-    over_ht = []
+    # --- Over/Under nel range ---
+    st.subheader(f"Over Goals (Range {start_min}-{end_min})")
+    over_data = []
     for t in [0.5, 1.5, 2.5]:
-        count = (df_target["tot_goals_ht"] > t).sum()
+        count = (df_target["tot_goals_range"] > t).sum()
         perc = round((count / len(df_target)) * 100, 2)
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        over_ht.append([f"Over {t} HT", count, perc, odd_min])
-    st.table(pd.DataFrame(over_ht, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-    mostra_top10_league(df_target)
+        over_data.append([f"Over {t} (range)", count, perc, odd_min])
+    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
-    st.subheader(f"Over Goals FT ({len(df_target)} partite)")
-    over_ft = []
-    for t in [0.5, 1.5, 2.5, 3.5, 4.5]:
-        count = (df_target["tot_goals_ft"] > t).sum()
-        perc = round((count / len(df_target)) * 100, 2)
-        odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        over_ft.append([f"Over {t} FT", count, perc, odd_min])
-    st.table(pd.DataFrame(over_ft, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-    mostra_top10_league(df_target)
-
-    btts = (df_target["tot_goals_ft"] > 0) & (temp_ft[1] > 0)
-    count_btts = btts.sum()
-    perc_btts = round(count_btts / len(df_target) * 100, 2)
+    btts = ((df_target["home_range"] > 0) & (df_target["away_range"] > 0)).sum()
+    perc_btts = round(btts / len(df_target) * 100, 2)
     odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
-    st.subheader(f"BTTS SI ({len(df_target)} partite)")
-    st.write(f"BTTS SI: {count_btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
+    st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
+    st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
     mostra_top10_league(df_target)
 
-    st.subheader(f"Distribuzione Gol per Timeframe ({len(df_target)} partite)")
+    # --- Distribuzione gol 0-90 ---
+    st.subheader("Distribuzione Gol per Timeframe (0-90)")
     intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
     risultati = []
     for (start, end) in intervalli:
