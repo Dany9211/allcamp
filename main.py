@@ -115,6 +115,7 @@ if st.sidebar.button("🔄 Reset Filtri"):
 
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
+
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
         mask = pd.to_numeric(filtered_df[col].astype(str).str.replace(",", "."), errors="coerce").between(val[0], val[1])
@@ -132,66 +133,72 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
+# --- FUNZIONI ---
+def calcola_winrate(df, col_risultato):
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
+    risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
+    for ris in df_valid[col_risultato]:
+        try:
+            home, away = map(int, ris.split("-"))
+            if home > away:
+                risultati["1 (Casa)"] += 1
+            elif home < away:
+                risultati["2 (Trasferta)"] += 1
+            else:
+                risultati["X (Pareggio)"] += 1
+        except:
+            continue
+    totale = len(df_valid)
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale) * 100, 2) if totale > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    return stats, totale
 
-# --- NUOVA FUNZIONALITÀ ---
+def mostra_winrate_combinato(df):
+    stats_ht, totale_ht = calcola_winrate(df, "risultato_ht")
+    stats_ft, totale_ft = calcola_winrate(df, "risultato_ft")
+
+    combined_data = []
+    for i in range(3):
+        combined_data.append([
+            stats_ft[i][0], 
+            stats_ht[i][1], stats_ht[i][2], stats_ht[i][3], 
+            stats_ft[i][1], stats_ft[i][2], stats_ft[i][3]
+        ])
+
+    df_combined = pd.DataFrame(combined_data, columns=[
+        "Esito",
+        "Conteggio HT", "WinRate HT %", "Odd Minima HT",
+        "Conteggio FT", "WinRate FT %", "Odd Minima FT"
+    ])
+    st.subheader("WinRate Combinato (HT & FT)")
+    st.table(df_combined)
+
 def analizza_gol_da_minuto(df):
-    st.subheader("Analisi Gol da Minuto selezionato")
-    
-    minuto_inizio = st.slider("Seleziona Minuto Corrente", 0, 45, 20)
-    risultati_ht = ["0-0", "0-1", "1-0", "1-1", "Altro"]
-    risultato_corrente = st.selectbox("Risultato corrente al minuto selezionato", risultati_ht)
-    
-    partite_target = 0
-    over_05 = 0
-    over_15 = 0
-    timeframe_counter = { "20-30":0, "31-40":0, "41-45":0 }
+    st.subheader("Analisi Gol da Minuto Selezionato")
+    minuto_selezionato = st.slider("Minuto di riferimento", 0, 45, 20)
 
+    partite_con_gol = 0
     for _, row in df.iterrows():
         gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
         gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
         gol_tot = gol_home + gol_away
-        
-        # Gol dopo il minuto selezionato
-        gol_successivi = [g for g in gol_tot if minuto_inizio < g <= 45]
+        if any(minuto_selezionato <= g <= 45 for g in gol_tot):
+            partite_con_gol += 1
 
-        # Controllo risultato corrente
-        ht_gol_home = sum(1 for g in gol_home if g <= minuto_inizio)
-        ht_gol_away = sum(1 for g in gol_away if g <= minuto_inizio)
-        current_score = f"{ht_gol_home}-{ht_gol_away}"
-        if risultato_corrente != "Altro" and current_score != risultato_corrente:
-            continue
-        
-        partite_target += 1
-        if len(gol_successivi) >= 1:
-            over_05 += 1
-        if len(gol_successivi) >= 2:
-            over_15 += 1
-        
-        # Conteggio timeframe
-        for g in gol_successivi:
-            if 20 <= g <= 30:
-                timeframe_counter["20-30"] += 1
-            elif 31 <= g <= 40:
-                timeframe_counter["31-40"] += 1
-            elif 41 <= g <= 45:
-                timeframe_counter["41-45"] += 1
+    totale = len(df)
+    perc = round((partite_con_gol / totale) * 100, 2) if totale > 0 else 0
+    st.write(f"Partite con gol tra {minuto_selezionato} e 45': {partite_con_gol} ({perc}%)")
 
-    st.write(f"**Partite analizzate:** {partite_target}")
-    st.write(f"Over 0.5 HT successivo: {over_05} ({round(over_05/partite_target*100,2) if partite_target>0 else 0}%)")
-    st.write(f"Over 1.5 HT successivo: {over_15} ({round(over_15/partite_target*100,2) if partite_target>0 else 0}%)")
-    st.write("Distribuzione gol successivi per timeframe (20-30, 31-40, 41-45):")
-    st.write(timeframe_counter)
-
-    if partite_target > 0:
-        st.write("**Pattern comuni sulle quote:**")
-        st.write(df[["odd_home", "odd_draw", "odd_away"]].mean().round(2))
-
+    # Quote medie
+    odds_cols = ["odd_home", "odd_draw", "odd_away"]
+    df_odds = df[odds_cols].apply(lambda x: pd.to_numeric(x.astype(str).str.replace(",", "."), errors="coerce"))
+    st.write("Quote medie sulle partite con gol successivi:")
+    st.write(df_odds.mean().round(2))
 
 # --- STATISTICHE ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
-    temp_ft = filtered_df["risultato_ft"].str.split("-", expand=True)
-    temp_ft = temp_ft.apply(pd.to_numeric, errors="coerce").fillna(0).astype(int)
-    filtered_df["home_g_ft"], filtered_df["away_g_ft"] = temp_ft[0], temp_ft[1]
-    filtered_df["tot_goals_ft"] = filtered_df["home_g_ft"] + filtered_df["away_g_ft"]
-
+    mostra_winrate_combinato(filtered_df)
     analizza_gol_da_minuto(filtered_df)
