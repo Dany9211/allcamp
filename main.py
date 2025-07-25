@@ -269,9 +269,9 @@ def calcola_media_gol(df):
     st.write(f"**Totale Medio Gol FT:** {round(media_home_ft + media_away_ft, 2)}")
     st.write(f"**Totale Medio Gol SH:** {round(media_home_sh + media_away_sh, 2)}")
 
-# --- CALCOLO RIMONTA ---
+# --- CALCOLO RIMONTA (LISTA COMPLETA) ---
 def calcola_rimonta(df):
-    st.subheader("TOP 5 Squadre Home e Away che Recuperano (da svantaggio HT a non-sconfitta FT)")
+    st.subheader("Squadre Home e Away che Recuperano (da svantaggio HT a non-sconfitta FT)")
 
     # --- Home ---
     home_df = df[df["gol_home_ht"] < df["gol_away_ht"]]
@@ -282,16 +282,10 @@ def calcola_rimonta(df):
                 "Non Perse FT": (x["gol_home_ft"] >= x["gol_away_ft"]).sum(),
                 "Winrate Recupero %": round((x["gol_home_ft"] >= x["gol_away_ft"]).mean() * 100, 2)
             })
-        )
+        ).sort_values("Winrate Recupero %", ascending=False)
 
-        home_stats = home_stats[home_stats["Partite Svantaggio HT"] >= 10]
-        home_stats = home_stats.sort_values("Winrate Recupero %", ascending=False).head(5)
-
-        if not home_stats.empty:
-            st.write("**Top 5 Home:**")
-            st.table(home_stats.reset_index())
-        else:
-            st.write("Nessuna squadra Home con almeno 10 partite in svantaggio HT.")
+        st.write("**Home (tutte le squadre):**")
+        st.table(home_stats.reset_index())
     else:
         st.write("Nessuna squadra Home con svantaggio a HT nel dataset filtrato.")
 
@@ -304,16 +298,10 @@ def calcola_rimonta(df):
                 "Non Perse FT": (x["gol_away_ft"] >= x["gol_home_ft"]).sum(),
                 "Winrate Recupero %": round((x["gol_away_ft"] >= x["gol_home_ft"]).mean() * 100, 2)
             })
-        )
+        ).sort_values("Winrate Recupero %", ascending=False)
 
-        away_stats = away_stats[away_stats["Partite Svantaggio HT"] >= 10]
-        away_stats = away_stats.sort_values("Winrate Recupero %", ascending=False).head(5)
-
-        if not away_stats.empty:
-            st.write("**Top 5 Away:**")
-            st.table(away_stats.reset_index())
-        else:
-            st.write("Nessuna squadra Away con almeno 10 partite in svantaggio HT.")
+        st.write("**Away (tutte le squadre):**")
+        st.table(away_stats.reset_index())
     else:
         st.write("Nessuna squadra Away con svantaggio a HT nel dataset filtrato.")
 
@@ -339,4 +327,4 @@ if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
         over_data.append([f"Over {t}", count, perc, round(100/perc, 2) if perc > 0 else "-"])
     st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
 
-    calcola_rimonta(filtered_df)
+calcola_rimonta(filtered_df)
