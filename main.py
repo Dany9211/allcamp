@@ -85,6 +85,13 @@ if "away_team" in df.columns:
     if selected_away != "Tutte":
         filters["away_team"] = selected_away
 
+# --- FILTRO LABEL_ODDS ---
+if "label_odds" in df.columns:
+    label_opts = ["Tutte"] + sorted(df["label_odds"].dropna().unique())
+    selected_label = st.sidebar.selectbox("Seleziona Label Odds", label_opts)
+    if selected_label != "Tutte":
+        filters["label_odds"] = selected_label
+
 # --- FILTRI QUOTE MANUALI ---
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
@@ -108,6 +115,15 @@ st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
 
+# --- FILTRO OVER 0.5 HT (percentuale) ---
+if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
+    df["over_0_5_ht"] = (df["gol_home_ht"] + df["gol_away_ht"] > 0).astype(int)
+    perc_over_0_5 = round(df["over_0_5_ht"].mean() * 100, 2)
+    st.sidebar.write(f"Percentuale Over 0.5 HT globale: {perc_over_0_5}%")
+    min_over = st.sidebar.number_input("Min % Over 0.5 HT", min_value=0, max_value=100, value=0)
+    max_over = st.sidebar.number_input("Max % Over 0.5 HT", min_value=0, max_value=100, value=100)
+    filters["over_0_5_ht"] = (min_over, max_over)
+
 # --- PULSANTE RESET ---
 if st.sidebar.button("🔄 Reset Filtri"):
     st.session_state.clear()
@@ -123,6 +139,11 @@ for col, val in filters.items():
     elif col == "giornata":
         mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
         filtered_df = filtered_df[mask.fillna(True)]
+    elif col == "over_0_5_ht":
+        perc = (filtered_df["gol_home_ht"] + filtered_df["gol_away_ht"] > 0).astype(int)
+        perc_val = round(perc.mean() * 100, 2)
+        if not (val[0] <= perc_val <= val[1]):
+            filtered_df = pd.DataFrame()
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
 
