@@ -119,7 +119,33 @@ def calcola_winrate(df, col_risultato):
         stats.append((esito, count, perc, odd_min))
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"]), totale
 
-# --- NUOVA FUNZIONE: ANALISI DA MINUTO A MINUTO ---
+# --- LABEL ODDS ---
+def assegna_label_odds(row):
+    try:
+        oh = float(str(row["odd_home"]).replace(",", "."))
+        oa = float(str(row["odd_away"]).replace(",", "."))
+    except:
+        return "N/A"
+
+    if oh <= 1.5:
+        return "Home strong fav"
+    elif 1.51 <= oh <= 2.0:
+        return "Home med fav"
+    elif 2.01 <= oh <= 2.5 and oa > 3.0:
+        return "Home small fav"
+    elif oa <= 1.5:
+        return "Away strong fav"
+    elif 1.51 <= oa <= 2.0:
+        return "Away med fav"
+    elif 2.01 <= oa <= 2.5 and oh > 3.0:
+        return "Away small fav"
+    elif oh < 3.0 and oa < 3.0:
+        return "Supercompetitive"
+    return "Altro"
+
+filtered_df["label_odds"] = filtered_df.apply(assegna_label_odds, axis=1)
+
+# --- ANALISI DAL MINUTO ---
 def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (da minuto A a B)")
     minuto_range = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
@@ -142,6 +168,13 @@ def analizza_da_minuto(df):
 
     df_target = pd.DataFrame(partite_target)
     st.write(f"**Partite trovate:** {len(df_target)}")
+
+    # --- STATISTICHE LABEL ODDS ---
+    st.subheader("Distribuzione Label Odds")
+    label_dist = df_target["label_odds"].value_counts().reset_index()
+    label_dist.columns = ["Label Odds", "Conteggio"]
+    label_dist["Percentuale %"] = round(label_dist["Conteggio"] / len(df_target) * 100, 2)
+    st.table(label_dist)
 
     # --- WINRATE HT & FT ---
     st.subheader("WinRate HT e FT")
