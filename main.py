@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 st.set_page_config(page_title="Allcamp Viewer", layout="wide")
-st.title("Analisi Avanzata allcamp con Range Minuti")
+st.title("Analisi Tabella allcamp con Minuto e Pattern")
 
 # --- Funzione connessione ---
 @st.cache_data
@@ -36,9 +36,9 @@ if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
-# --- Slider Range Minuti ---
+# --- Slider Minuto e Risultato Corrente ---
 st.sidebar.header("Analisi Minuto e Risultato")
-minuto_da, minuto_a = st.sidebar.slider("Seleziona Intervallo Minuti", 1, 90, (20, 45))
+minuto_corrente = st.sidebar.slider("Seleziona Minuto Corrente", 1, 90, 20)
 risultati_possibili = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique())
 risultato_corrente = st.sidebar.selectbox("Seleziona Risultato Corrente (HT)", risultati_possibili)
 
@@ -71,32 +71,32 @@ for col, val in filters.items():
     else:
         filtered_df = filtered_df[filtered_df[col] == val]
 
-# --- Analisi Gol nel range minuti ---
-def analizza_gol_range(df, da_minuto, a_minuto, risultato_sel):
-    st.subheader(f"Analisi Gol tra {da_minuto} e {a_minuto} min")
+# --- Analisi Gol dal Minuto Selezionato ---
+def analizza_gol_da_minuto(df, minuto, risultato_sel):
+    st.subheader(f"Analisi Gol dopo il Minuto {minuto} (fino a 45')")
 
     # Filtro su risultato corrente
     if risultato_sel != "Tutti":
         df = df[df["risultato_ht"] == risultato_sel]
 
     partite = len(df)
-    partite_con_gol = 0
+    gol_successivi = 0
 
     for _, row in df.iterrows():
         home_goals = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
         away_goals = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        goals = [g for g in home_goals + away_goals if da_minuto <= g <= a_minuto]
+        goals = [g for g in home_goals + away_goals if minuto < g <= 45]
         if goals:
-            partite_con_gol += 1
+            gol_successivi += 1
 
-    perc = round((partite_con_gol / partite) * 100, 2) if partite > 0 else 0
-    st.write(f"Partite con almeno 1 gol tra {da_minuto} e {a_minuto} min: **{partite_con_gol}/{partite} ({perc}%)**")
+    perc = round((gol_successivi / partite) * 100, 2) if partite > 0 else 0
+    st.write(f"Partite con almeno 1 gol tra {minuto} e 45': **{gol_successivi}/{partite} ({perc}%)**")
 
     return df
 
-# --- Over & BTTS ---
-def calcola_over_btts(df):
-    st.subheader(f"Over Goals e BTTS")
+# --- Over & BTTS dopo il minuto selezionato ---
+def calcola_over_btts(df, minuto):
+    st.subheader(f"Over e BTTS dal minuto {minuto}")
     risultati = {"Over 0.5 HT": 0, "Over 1.5 HT": 0, "Over 2.5 HT": 0,
                  "Over 0.5 FT": 0, "Over 1.5 FT": 0, "Over 2.5 FT": 0,
                  "Over 3.5 FT": 0, "Over 4.5 FT": 0, "BTTS SI": 0}
@@ -160,39 +160,8 @@ def calcola_winrate_ht_ft(df):
     )
     st.table(df_win)
 
-# --- Distribuzione per fasce Odds ed Elo ---
-def distribuzione_fasce(df):
-    st.subheader("Distribuzione per Fasce Odds & Elo")
-    fasce = {
-        "Home Odds 1-1.5": df[(df["odd_home"].astype(float) >= 1) & (df["odd_home"].astype(float) <= 1.5)],
-        "Home Odds 1.51-2.0": df[(df["odd_home"].astype(float) > 1.5) & (df["odd_home"].astype(float) <= 2.0)],
-        "Home Odds > 2.0": df[df["odd_home"].astype(float) > 2.0]
-    }
-    stats = []
-    for nome, subset in fasce.items():
-        stats.append([nome, len(subset), round((len(subset)/len(df))*100, 2)])
-    st.table(pd.DataFrame(stats, columns=["Fascia", "Partite", "%"]))
-
-# --- Gol per Timeframe ---
-def tabella_timeframe_gol(df):
-    st.subheader("Distribuzione Gol per Timeframe")
-    intervalli = [(1, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
-    risultati = []
-    for (start, end) in intervalli:
-        partite_con_gol = 0
-        for _, row in df.iterrows():
-            gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-            gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-            if any(start <= g <= end for g in gol_home + gol_away):
-                partite_con_gol += 1
-        perc = round((partite_con_gol / len(df)) * 100, 2) if len(df) > 0 else 0
-        risultati.append([f"{start}-{end}", partite_con_gol, perc])
-    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %"]))
-
-# --- MAIN ---
+# --- MAIN ANALYSIS ---
 if not filtered_df.empty:
-    filtered_df = analizza_gol_range(filtered_df, minuto_da, minuto_a, risultato_corrente)
-    calcola_over_btts(filtered_df)
+    filtered_df = analizza_gol_da_minuto(filtered_df, minuto_corrente, risultato_corrente)
+    calcola_over_btts(filtered_df, minuto_corrente)
     calcola_winrate_ht_ft(filtered_df)
-    distribuzione_fasce(filtered_df)
-    tabella_timeframe_gol(filtered_df)
