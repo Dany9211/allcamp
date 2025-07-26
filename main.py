@@ -62,6 +62,20 @@ if "giornata" in df.columns:
     )
     filters["giornata"] = giornata_range
 
+# --- FILTRO SQUADRA HOME ---
+if "home_team" in df.columns:
+    home_teams = ["Tutte"] + sorted(df["home_team"].dropna().unique())
+    selected_home = st.sidebar.selectbox("Seleziona Squadra Home", home_teams)
+    if selected_home != "Tutte":
+        filters["home_team"] = selected_home
+
+# --- FILTRO SQUADRA AWAY ---
+if "away_team" in df.columns:
+    away_teams = ["Tutte"] + sorted(df["away_team"].dropna().unique())
+    selected_away = st.sidebar.selectbox("Seleziona Squadra Away", away_teams)
+    if selected_away != "Tutte":
+        filters["away_team"] = selected_away
+
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
         col_temp = pd.to_numeric(df[col_name].astype(str).str.replace(",", "."), errors="coerce")
@@ -157,7 +171,7 @@ def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (da minuto A a B)")
     start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
     risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
-                                        ["0-0", "1-0", "0-1", "1-1"], default=["0-0"])
+                                        ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2"], default=["0-0"])
 
     partite_target = []
     for _, row in df.iterrows():
