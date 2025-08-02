@@ -106,6 +106,37 @@ for col, val in filters.items():
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
+st.subheader("Distribuzione Gol Globale — Intervalli da 15 minuti (in base ai filtri)")
+intervalli_15min = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+risultati_globale = []
+
+for (start, end) in intervalli_15min:
+    partite_con_gol = 0
+    for _, row in filtered_df.iterrows():
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        if any(start <= g <= end for g in gol_home + gol_away):
+            partite_con_gol += 1
+    perc = round((partite_con_gol / len(filtered_df)) * 100, 2)
+    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+    risultati_globale.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
+st.subheader("Distribuzione Gol — Intervalli da 15 minuti (solo partite nel range e risultato iniziale)")
+intervalli_15min = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+risultati_15min = []
+
+for (start, end) in intervalli_15min:
+    partite_con_gol = 0
+    for _, row in df_target.iterrows():
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        if any(start <= g <= end for g in gol_home + gol_away):
+            partite_con_gol += 1
+    perc = round((partite_con_gol / len(df_target)) * 100, 2)
+    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+    risultati_15min.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
+
+st.table(pd.DataFrame(risultati_15min, columns=["Timeframe 15'", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+st.table(pd.DataFrame(risultati_globale, columns=["Timeframe 15'", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 def calcola_winrate(df, col_risultato):
     df_valid = df[df[col_risultato].notna() & df[col_risultato].str.contains("-")]
     risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
