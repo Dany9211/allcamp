@@ -74,7 +74,6 @@ if "away_team" in df.columns:
     if selected_away != "Tutte":
         filters["away_team"] = selected_away
 
-# --- Nuovo filtro: risultato HT ---
 if "risultato_ht" in df.columns:
     risultati_ht = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique())
     selected_ris_ht = st.sidebar.selectbox("Seleziona Risultato HT", risultati_ht)
@@ -115,8 +114,8 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- Analisi da minuto con distribuzione 5 min ---
-def analizza_da_minuto(df):
+# --- Analisi distribuzione gol ogni 5 minuti ---
+def distribuzione_5min(df):
     st.subheader("Distribuzione Gol ogni 5 minuti (0-90+)")
     timebands = [(1, 5), (6, 10), (11, 15), (16, 20), (21, 25), (26, 30), (31, 35), (36, 40), (41, 45),
                  (46, 50), (51, 55), (56, 60), (61, 65), (66, 70), (71, 75), (76, 80), (81, 85), (86, 90), (91, 120)]
@@ -136,5 +135,6 @@ def analizza_da_minuto(df):
 
     st.table(pd.DataFrame(risultati, columns=["Timeframe (min)", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 
+# --- ESECUZIONE ---
 if not filtered_df.empty:
-    analizza_da_minuto(filtered_df)
+    distribuzione_5min(filtered_df)
