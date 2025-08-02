@@ -332,15 +332,16 @@ def calcola_next_goal(df_to_analyze, start_min, end_min):
         gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
         gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
 
-        next_home_goal = min([g for g in gol_home if g >= start_min] or [float('inf')])
-        next_away_goal = min([g for g in gol_away if g >= start_min] or [float('inf')])
+        next_home_goal = min([g for g in gol_home if start_min <= g <= end_min] or [float('inf')])
+        next_away_goal = min([g for g in gol_away if start_min <= g <= end_min] or [float('inf')])
         
         if next_home_goal < next_away_goal:
             risultati["Prossimo Gol: Home"] += 1
         elif next_away_goal < next_home_goal:
             risultati["Prossimo Gol: Away"] += 1
         else:
-            risultati["Nessun prossimo gol"] += 1
+            if next_home_goal == float('inf'):
+                risultati["Nessun prossimo gol"] += 1
 
     stats = []
     for esito, count in risultati.items():
@@ -781,6 +782,8 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
     if not filtered_df.empty:
         # --- ANALISI DAL MINUTO (integrata) ---
         start_min = st.slider("Seleziona minuto di partenza", 1, 90, 45)
+        end_min = st.slider("Seleziona minuto finale", start_min, 90, 90)
+
         risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
                                             sorted(df["risultato_ht"].unique()) if "risultato_ht" in df.columns else [],
                                             default=["0-0"])
@@ -902,7 +905,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             
             # Next Goal nell'analisi dinamica
             st.subheader("Next Goal (Dinamica)")
-            styled_df = calcola_next_goal(df_target, start_min, 90).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            styled_df = calcola_next_goal(df_target, start_min, end_min).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
             
             # Analisi Rimonte Dinamica
