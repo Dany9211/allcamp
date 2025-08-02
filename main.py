@@ -171,6 +171,41 @@ def calcola_winrate(df, col_risultato):
         stats.append((esito, count, perc, odd_min))
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
 
+# --- FUNZIONE CALCOLO FIRST TO SCORE ---
+def calcola_first_to_score(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+    
+    risultati = {"Home Team": 0, "Away Team": 0, "No Goals": 0}
+    totale_partite = len(df_to_analyze)
+
+    for _, row in df_to_analyze.iterrows():
+        gol_home_str = str(row.get("minutaggio_gol", ""))
+        gol_away_str = str(row.get("minutaggio_gol_away", ""))
+
+        gol_home = [int(x) for x in gol_home_str.split(";") if x.isdigit()]
+        gol_away = [int(x) for x in gol_away_str.split(";") if x.isdigit()]
+
+        min_home_goal = min(gol_home) if gol_home else float('inf')
+        min_away_goal = min(gol_away) if gol_away else float('inf')
+        
+        if min_home_goal < min_away_goal:
+            risultati["Home Team"] += 1
+        elif min_away_goal < min_home_goal:
+            risultati["Away Team"] += 1
+        else: 
+            if min_home_goal == float('inf'):
+                risultati["No Goals"] += 1
+
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    
+    return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+
+
 # --- RISULTATI ESATTI ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
     risultati_interessanti = [
@@ -333,6 +368,10 @@ if not filtered_df.empty:
     st.subheader("BTTS SI FT")
     st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
 
+    # First to Score
+    st.subheader("First to Score (Pre-Match)")
+    st.table(calcola_first_to_score(filtered_df))
+
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
 
@@ -394,6 +433,10 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
             st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
             st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
+            
+            # First to Score nell'analisi dinamica
+            st.subheader("First to Score (Dinamica)")
+            st.table(calcola_first_to_score(df_target))
             
             # Qui viene mostrata la timeband basata sull'analisi dinamica
             st.subheader("Distribuzione Gol per Timeframe (dinamica)")
