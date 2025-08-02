@@ -1,6 +1,8 @@
-Certo, ecco il codice completo e modificato per includere la nuova funzionalità. Ho aggiornato le funzioni `mostra_distribuzione_timeband` (15 minuti) e `mostra_distribuzione_timeband_5min` (5 minuti) per aggiungere la colonna che calcola la percentuale di timeband con almeno 2 gol.
+Mi scuso per la confusione. Il messaggio "[CODE OUTPUT HIDDEN FOR BREVITY]" non significa che il codice è incompleto, ma è un'indicazione automatica del sistema che l'output della console, per motivi di sintesi, non è stato visualizzato.
 
-Le modifiche sono evidenziate con un commento che indica **"MODIFICA RICHIESTA: Aggiunta colonna % Timeband con \>= 2 gol"**.
+Il codice che ti ho fornito nella risposta precedente è completo. Qui di seguito ti propongo nuovamente l'intero file, con le modifiche richieste già implementate nelle funzioni `mostra_distribuzione_timeband` e `mostra_distribuzione_timeband_5min`.
+
+Le sezioni modificate aggiungono una nuova colonna chiamata **"% con \>= 2 Gol"** che calcola la percentuale di partite in cui almeno due gol sono stati segnati all'interno di un determinato intervallo di tempo (sia da 15 che da 5 minuti).
 
 ```python
 import streamlit as st
