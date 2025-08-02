@@ -475,7 +475,7 @@ def calcola_btts_ht(df_to_analyze):
     df_btts_ht["gol_away_ht"] = pd.to_numeric(df_btts_ht["gol_away_ht"], errors='coerce')
     
     btts_count = ((df_btts_ht["gol_home_ht"] > 0) & (df_btts_ht["gol_away_ht"] > 0)).sum()
-    no_btts_count = ((df_btts_ht["gol_home_ht"] == 0) | (df_btts_ht["gol_away_ht"] == 0)).sum()
+    no_btts_count = len(df_btts_ht) - btts_count
     
     total_matches = len(df_btts_ht)
     
@@ -499,7 +499,7 @@ def calcola_btts_ft(df_to_analyze):
     df_btts_ft["gol_away_ft"] = pd.to_numeric(df_btts_ft["gol_away_ft"], errors='coerce')
     
     btts_count = ((df_btts_ft["gol_home_ft"] > 0) & (df_btts_ft["gol_away_ft"] > 0)).sum()
-    no_btts_count = ((df_btts_ft["gol_home_ft"] == 0) | (df_btts_ft["gol_away_ft"] == 0)).sum()
+    no_btts_count = len(df_btts_ft) - btts_count
     
     total_matches = len(df_btts_ft)
     
@@ -563,6 +563,32 @@ def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
     df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
 
+    return df_stats
+    
+# --- NUOVA FUNZIONE PER BTTS HT DINAMICO ---
+def calcola_btts_ht_dinamico(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+
+    df_btts_ht_dinamico = df_to_analyze.copy()
+    
+    # Assicurati che le colonne siano numeriche
+    df_btts_ht_dinamico["gol_home_ht"] = pd.to_numeric(df_btts_ht_dinamico["gol_home_ht"], errors='coerce')
+    df_btts_ht_dinamico["gol_away_ht"] = pd.to_numeric(df_btts_ht_dinamico["gol_away_ht"], errors='coerce')
+    
+    btts_count = ((df_btts_ht_dinamico["gol_home_ht"] > 0) & (df_btts_ht_dinamico["gol_away_ht"] > 0)).sum()
+    no_btts_count = len(df_btts_ht_dinamico) - btts_count
+    
+    total_matches = len(df_btts_ht_dinamico)
+    
+    data = [
+        ["BTTS SI HT (Dinamica)", btts_count, round((btts_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["BTTS NO HT (Dinamica)", no_btts_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
     return df_stats
 
 # --- NUOVA FUNZIONE PER CLEAN SHEET ---
@@ -712,16 +738,20 @@ if not filtered_df.empty:
     mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
     mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
 
-    # WinRate
+    # WinRate con grafico
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("WinRate HT")
-        styled_df_ht = calcola_winrate(filtered_df, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        df_winrate_ht = calcola_winrate(filtered_df, "risultato_ht")
+        styled_df_ht = df_winrate_ht.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
         st.dataframe(styled_df_ht)
+        st.bar_chart(df_winrate_ht.set_index('Esito')['WinRate %'])
     with col2:
         st.subheader("WinRate FT")
-        styled_df_ft = calcola_winrate(filtered_df, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        df_winrate_ft = calcola_winrate(filtered_df, "risultato_ft")
+        styled_df_ft = df_winrate_ft.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
         st.dataframe(styled_df_ft)
+        st.bar_chart(df_winrate_ft.set_index('Esito')['WinRate %'])
 
     # Over Goals HT e FT
     col1, col2 = st.columns(2)
@@ -753,17 +783,21 @@ if not filtered_df.empty:
         styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_over_ft)
         
-    # BTTS
+    # BTTS con grafico
     st.subheader("BTTS (Pre-Match)")
     col1, col2 = st.columns(2)
     with col1:
         st.write("### HT")
-        styled_df = calcola_btts_ht(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        df_btts_ht = calcola_btts_ht(filtered_df)
+        styled_df = df_btts_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
+        st.bar_chart(df_btts_ht.set_index('Mercato')['Percentuale %'])
     with col2:
         st.write("### FT")
-        styled_df = calcola_btts_ft(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        df_btts_ft = calcola_btts_ft(filtered_df)
+        styled_df = df_btts_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
+        st.bar_chart(df_btts_ft.set_index('Mercato')['Percentuale %'])
 
     # Multi Gol
     st.subheader("Multi Gol (Pre-Match)")
@@ -870,11 +904,15 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             # WinRate
             st.subheader(f"WinRate (Dinamica)")
             st.write("**HT:**")
-            styled_df_ht = calcola_winrate(df_target, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+            df_winrate_ht_dynamic = calcola_winrate(df_target, "risultato_ht")
+            styled_df_ht = df_winrate_ht_dynamic.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
             st.dataframe(styled_df_ht)
+            st.bar_chart(df_winrate_ht_dynamic.set_index('Esito')['WinRate %'])
             st.write("**FT:**")
-            styled_df_ft = calcola_winrate(df_target, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+            df_winrate_ft_dynamic = calcola_winrate(df_target, "risultato_ft")
+            styled_df_ft = df_winrate_ft_dynamic.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
             st.dataframe(styled_df_ft)
+            st.bar_chart(df_winrate_ft_dynamic.set_index('Esito')['WinRate %'])
 
             # Over Goals HT e FT
             col1, col2 = st.columns(2)
@@ -907,8 +945,19 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             
             # BTTS
             st.subheader("BTTS (Dinamica)")
-            styled_df = calcola_btts_dinamico(df_target, start_min, risultati_correnti).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-            st.dataframe(styled_df)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### HT")
+                df_btts_ht_dynamic = calcola_btts_ht_dinamico(df_target)
+                styled_df = df_btts_ht_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+                st.bar_chart(df_btts_ht_dynamic.set_index('Mercato')['Percentuale %'])
+            with col2:
+                st.write("### FT")
+                df_btts_ft_dynamic = calcola_btts_dinamico(df_target, start_min, risultati_correnti)
+                styled_df = df_btts_ft_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+                st.bar_chart(df_btts_ft_dynamic.set_index('Mercato')['Percentuale %'])
 
             # Multi Gol
             st.subheader("Multi Gol (Dinamica)")
@@ -1030,16 +1079,20 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             mostra_risultati_esatti(h2h_df, "risultato_ht", "HT H2H")
             mostra_risultati_esatti(h2h_df, "risultato_ft", "FT H2H")
 
-            # WinRate H2H
+            # WinRate H2H con grafico
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("WinRate HT H2H")
-                styled_df_ht = calcola_winrate(h2h_df, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+                df_winrate_ht_h2h = calcola_winrate(h2h_df, "risultato_ht")
+                styled_df_ht = df_winrate_ht_h2h.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
                 st.dataframe(styled_df_ht)
+                st.bar_chart(df_winrate_ht_h2h.set_index('Esito')['WinRate %'])
             with col2:
                 st.subheader("WinRate FT H2H")
-                styled_df_ft = calcola_winrate(h2h_df, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+                df_winrate_ft_h2h = calcola_winrate(h2h_df, "risultato_ft")
+                styled_df_ft = df_winrate_ft_h2h.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
                 st.dataframe(styled_df_ft)
+                st.bar_chart(df_winrate_ft_h2h.set_index('Esito')['WinRate %'])
 
             # Over Goals H2H
             col1, col2 = st.columns(2)
@@ -1070,17 +1123,21 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                 styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_over_ft)
             
-            # BTTS H2H
+            # BTTS H2H con grafico
             st.subheader("BTTS (H2H)")
             col1, col2 = st.columns(2)
             with col1:
                 st.write("### HT")
-                styled_df = calcola_btts_ht(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                df_btts_ht_h2h = calcola_btts_ht(h2h_df)
+                styled_df = df_btts_ht_h2h.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
+                st.bar_chart(df_btts_ht_h2h.set_index('Mercato')['Percentuale %'])
             with col2:
                 st.write("### FT")
-                styled_df = calcola_btts_ft(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                df_btts_ft_h2h = calcola_btts_ft(h2h_df)
+                styled_df = df_btts_ft_h2h.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
+                st.bar_chart(df_btts_ft_h2h.set_index('Mercato')['Percentuale %'])
 
             # Multi Gol H2H
             st.subheader("Multi Gol (H2H)")
@@ -1127,3 +1184,114 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                         st.markdown(f"**{tipo}:** {', '.join(squadre)}")
             else:
                 st.warning("Nessuna rimonta trovata nel dataset filtrato.")
+
+
+# --- SEZIONE 6: Backtesting Strategie ---
+st.subheader("6. Backtesting Strategie")
+st.write("Testa una strategia di scommesse sui dati filtrati.")
+
+# Aggiungi un expander per contenere la logica di backtesting
+with st.expander("Configura e avvia il Backtest"):
+    
+    if filtered_df.empty:
+        st.warning("Il DataFrame filtrato è vuoto, non è possibile eseguire il backtest.")
+    else:
+        # Funzione per eseguire il backtest
+        def esegui_backtest(df_to_analyze, market, stake):
+            vincite = 0
+            perdite = 0
+            profit_loss = 0
+            numero_scommesse = 0
+            
+            for _, row in df_to_analyze.iterrows():
+                # Assumi che le quote e i risultati esistano nel DataFrame
+                # Semplifichiamo la logica per i mercati più comuni
+                if market == "1 (Casa)":
+                    odd = pd.to_numeric(row.get("odd_home", 0), errors='coerce')
+                    risultato_ft = row.get("risultato_ft", "0-0")
+                    home_goals, away_goals = map(int, risultato_ft.split("-"))
+                    if odd > 0:
+                        if home_goals > away_goals:
+                            vincite += 1
+                            profit_loss += (odd - 1) * stake
+                        else:
+                            perdite += 1
+                            profit_loss -= stake
+                        numero_scommesse += 1
+
+                elif market == "X (Pareggio)":
+                    odd = pd.to_numeric(row.get("odd_draw", 0), errors='coerce')
+                    risultato_ft = row.get("risultato_ft", "0-0")
+                    home_goals, away_goals = map(int, risultato_ft.split("-"))
+                    if odd > 0:
+                        if home_goals == away_goals:
+                            vincite += 1
+                            profit_loss += (odd - 1) * stake
+                        else:
+                            perdite += 1
+                            profit_loss -= stake
+                        numero_scommesse += 1
+
+                elif market == "2 (Trasferta)":
+                    odd = pd.to_numeric(row.get("odd_away", 0), errors='coerce')
+                    risultato_ft = row.get("risultato_ft", "0-0")
+                    home_goals, away_goals = map(int, risultato_ft.split("-"))
+                    if odd > 0:
+                        if home_goals < away_goals:
+                            vincite += 1
+                            profit_loss += (odd - 1) * stake
+                        else:
+                            perdite += 1
+                            profit_loss -= stake
+                        numero_scommesse += 1
+                
+                elif market == "Over 2.5 FT":
+                    odd = pd.to_numeric(row.get("odd_over2_5", 0), errors='coerce')
+                    tot_goals = pd.to_numeric(row.get("gol_home_ft", 0), errors='coerce') + pd.to_numeric(row.get("gol_away_ft", 0), errors='coerce')
+                    if odd > 0:
+                        if tot_goals > 2.5:
+                            vincite += 1
+                            profit_loss += (odd - 1) * stake
+                        else:
+                            perdite += 1
+                            profit_loss -= stake
+                        numero_scommesse += 1
+                        
+                elif market == "BTTS SI FT":
+                    odd = pd.to_numeric(row.get("odd_btts_si", 0), errors='coerce')
+                    home_goals = pd.to_numeric(row.get("gol_home_ft", 0), errors='coerce')
+                    away_goals = pd.to_numeric(row.get("gol_away_ft", 0), errors='coerce')
+                    if odd > 0:
+                        if home_goals > 0 and away_goals > 0:
+                            vincite += 1
+                            profit_loss += (odd - 1) * stake
+                        else:
+                            perdite += 1
+                            profit_loss -= stake
+                        numero_scommesse += 1
+            
+            roi = (profit_loss / (numero_scommesse * stake)) * 100 if numero_scommesse > 0 else 0
+            
+            return vincite, perdite, numero_scommesse, profit_loss, roi
+
+        # UI per il backtest
+        backtest_market = st.selectbox(
+            "Seleziona un mercato da testare",
+            ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)", "Over 2.5 FT", "BTTS SI FT"]
+        )
+        stake = st.number_input("Stake per scommessa", min_value=1.0, value=1.0, step=0.5)
+        
+        if st.button("Avvia Backtest"):
+            vincite, perdite, numero_scommesse, profit_loss, roi = esegui_backtest(filtered_df, backtest_market, stake)
+            
+            col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+            col_met1.metric("Numero Scommesse", numero_scommesse)
+            col_met2.metric("Vincite", vincite)
+            col_met3.metric("Perdite", perdite)
+            col_met4.metric("Profitto/Perdita", f"{profit_loss:.2f} €")
+            
+            if numero_scommesse > 0:
+                st.metric("ROI", f"{roi:.2f} %")
+            else:
+                st.metric("ROI", "0.00 %")
+
