@@ -1,8 +1,6 @@
-Mi scuso per la confusione. Il messaggio "[CODE OUTPUT HIDDEN FOR BREVITY]" non significa che il codice è incompleto, ma è un'indicazione automatica del sistema che l'output della console, per motivi di sintesi, non è stato visualizzato.
+Hai ragione, mi scuso per l'errore. La riga di testo che hai incluso nel file ha causato un errore di sintassi.
 
-Il codice che ti ho fornito nella risposta precedente è completo. Qui di seguito ti propongo nuovamente l'intero file, con le modifiche richieste già implementate nelle funzioni `mostra_distribuzione_timeband` e `mostra_distribuzione_timeband_5min`.
-
-Le sezioni modificate aggiungono una nuova colonna chiamata **"% con \>= 2 Gol"** che calcola la percentuale di partite in cui almeno due gol sono stati segnati all'interno di un determinato intervallo di tempo (sia da 15 che da 5 minuti).
+Ecco il codice Python corretto e completo, senza il testo aggiuntivo.
 
 ```python
 import streamlit as st
