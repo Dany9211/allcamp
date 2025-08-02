@@ -348,6 +348,28 @@ else:
 st.subheader("3. Analisi Pre-Match Completa (Filtri Sidebar)")
 st.write(f"Analisi completa basata su **{len(filtered_df)}** partite, considerando tutti i filtri del menu a sinistra.")
 if not filtered_df.empty:
+    
+    # Calcolo e visualizzazione media gol
+    st.subheader("Media Gol (Pre-Match)")
+    df_prematch_goals = filtered_df.copy()
+    
+    df_prematch_goals["gol_home_ht"] = pd.to_numeric(df_prematch_goals["gol_home_ht"], errors='coerce')
+    df_prematch_goals["gol_away_ht"] = pd.to_numeric(df_prematch_goals["gol_away_ht"], errors='coerce')
+    df_prematch_goals["gol_home_ft"] = pd.to_numeric(df_prematch_goals["gol_home_ft"], errors='coerce')
+    df_prematch_goals["gol_away_ft"] = pd.to_numeric(df_prematch_goals["gol_away_ft"], errors='coerce')
+    
+    # Media gol HT
+    avg_ht_goals = (df_prematch_goals["gol_home_ht"] + df_prematch_goals["gol_away_ht"]).mean()
+    # Media gol FT
+    avg_ft_goals = (df_prematch_goals["gol_home_ft"] + df_prematch_goals["gol_away_ft"]).mean()
+    # Media gol SH (secondo tempo)
+    avg_sh_goals = (df_prematch_goals["gol_home_ft"] + df_prematch_goals["gol_away_ft"] - df_prematch_goals["gol_home_ht"] - df_prematch_goals["gol_away_ht"]).mean()
+    
+    st.table(pd.DataFrame({
+        "Periodo": ["HT", "FT", "SH"],
+        "Media Gol": [f"{avg_ht_goals:.2f}", f"{avg_ft_goals:.2f}", f"{avg_sh_goals:.2f}"]
+    }))
+    
     mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
     mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
 
@@ -431,6 +453,27 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             df_target = pd.DataFrame(partite_target)
             st.write(f"**Partite trovate:** {len(df_target)}")
 
+            # Calcolo e visualizzazione media gol dinamica
+            st.subheader("Media Gol (Dinamica)")
+            df_target_goals = df_target.copy()
+            
+            df_target_goals["gol_home_ht"] = pd.to_numeric(df_target_goals["gol_home_ht"], errors='coerce')
+            df_target_goals["gol_away_ht"] = pd.to_numeric(df_target_goals["gol_away_ht"], errors='coerce')
+            df_target_goals["gol_home_ft"] = pd.to_numeric(df_target_goals["gol_home_ft"], errors='coerce')
+            df_target_goals["gol_away_ft"] = pd.to_numeric(df_target_goals["gol_away_ft"], errors='coerce')
+            
+            # Media gol HT
+            avg_ht_goals_dynamic = (df_target_goals["gol_home_ht"] + df_target_goals["gol_away_ht"]).mean()
+            # Media gol FT
+            avg_ft_goals_dynamic = (df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"]).mean()
+            # Media gol SH (secondo tempo)
+            avg_sh_goals_dynamic = (df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"] - df_target_goals["gol_home_ht"] - df_target_goals["gol_away_ht"]).mean()
+            
+            st.table(pd.DataFrame({
+                "Periodo": ["HT", "FT", "SH"],
+                "Media Gol": [f"{avg_ht_goals_dynamic:.2f}", f"{avg_ft_goals_dynamic:.2f}", f"{avg_sh_goals_dynamic:.2f}"]
+            }))
+            
             mostra_risultati_esatti(df_target, "risultato_ht", "HT")
             mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
