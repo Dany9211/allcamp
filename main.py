@@ -649,38 +649,30 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             mostra_risultati_esatti(df_target, "risultato_ht", "HT")
             mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
-            # --- Calcolo gol nel range ---
-            def conta_gol_range(row):
-                gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-                gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-                home_in_range = sum(1 for g in gol_home if start_min <= g <= end_min)
-                away_in_range = sum(1 for g in gol_away if start_min <= g <= end_min)
-                return home_in_range, away_in_range
-
-            df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
-            df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
-
-            st.subheader(f"WinRate (Range {start_min}-{end_min})")
+            # WinRate
+            st.subheader(f"WinRate (Dinamica)")
             st.write("**HT:**")
             st.table(calcola_winrate(df_target, "risultato_ht"))
             st.write("**FT:**")
             st.table(calcola_winrate(df_target, "risultato_ft"))
 
-            st.subheader(f"Over Goals (Range {start_min}-{end_min})")
-            over_data = []
+            # Over Goals FT
+            st.subheader("Over Goals FT (Dinamica)")
+            over_ft_data = []
             for t in [0.5, 1.5, 2.5]:
-                count = (df_target["tot_goals_range"] > t).sum()
-                perc = round((count / len(df_target)) * 100, 2)
+                count = (df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"] > t).sum()
+                perc = round((count / len(df_target_goals)) * 100, 2)
                 odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                over_data.append([f"Over {t} (range)", count, perc, odd_min])
-            st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-
-            btts = ((df_target["home_range"] > 0) & (df_target["away_range"] > 0)).sum()
-            perc_btts = round(btts / len(df_target) * 100, 2)
-            odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
-            st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
-            st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
+                over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
+            st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
             
+            # BTTS
+            btts_ft = ((df_target_goals["gol_home_ft"] > 0) & (df_target_goals["gol_away_ft"] > 0)).sum()
+            perc_btts_ft = round(btts_ft / len(df_target_goals) * 100, 2) if len(df_target_goals) > 0 else 0
+            odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
+            st.subheader("BTTS SI FT (Dinamica)")
+            st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
+
             # First to Score nell'analisi dinamica
             st.subheader("First to Score (Dinamica)")
             st.table(calcola_first_to_score(df_target))
