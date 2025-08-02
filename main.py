@@ -278,35 +278,63 @@ if not filtered_df.empty:
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati.")
 
-# --- NUOVA SEZIONE: Statistiche Pre-Match HT Over/Under ---
-st.subheader("3. Statistiche Pre-Match HT")
-# Crea un DataFrame per l'analisi pre-match, escludendo il filtro 'risultato_ht'
-df_prematch_ht = df.copy()
-prematch_filters = {k: v for k, v in filters.items() if k != 'risultato_ht'}
-for col, val in prematch_filters.items():
-    if col in ["odd_home", "odd_draw", "odd_away"]:
-        mask = pd.to_numeric(df_prematch_ht[col].astype(str).str.replace(",", "."), errors="coerce").between(val[0], val[1])
-        df_prematch_ht = df_prematch_ht[mask.fillna(True)]
-    elif col == "giornata":
-        mask = pd.to_numeric(df_prematch_ht[col], errors="coerce").between(val[0], val[1])
-        df_prematch_ht = df_prematch_ht[mask.fillna(True)]
-    else:
-        df_prematch_ht = df_prematch_ht[df_prematch_ht[col] == val]
 
-if not df_prematch_ht.empty:
-    st.write(f"Analisi basata su **{len(df_prematch_ht)}** partite (escluso il filtro Risultato HT).")
+# --- NUOVA SEZIONE: Statistiche Pre-Match Complete (Filtri Sidebar) ---
+st.subheader("3. Analisi Pre-Match Completa (Filtri Sidebar)")
+st.write(f"Analisi completa basata su **{len(filtered_df)}** partite, considerando tutti i filtri del menu a sinistra.")
+if not filtered_df.empty:
+    mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
+
+    # WinRate
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("WinRate HT")
+        st.table(calcola_winrate(filtered_df, "risultato_ht"))
+    with col2:
+        st.subheader("WinRate FT")
+        st.table(calcola_winrate(filtered_df, "risultato_ft"))
+
+    # Over Goals HT e FT
+    col1, col2 = st.columns(2)
+    df_prematch_ht = filtered_df.copy()
     df_prematch_ht["tot_goals_ht"] = pd.to_numeric(df_prematch_ht["gol_home_ht"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ht"], errors='coerce')
-    
-    over_ht_data = []
-    for t in [0.5, 1.5, 2.5]:
-        count = (df_prematch_ht["tot_goals_ht"] > t).sum()
-        perc = round((count / len(df_prematch_ht)) * 100, 2)
-        odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
-    st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+    df_prematch_ht["tot_goals_ft"] = pd.to_numeric(df_prematch_ht["gol_home_ft"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ft"], errors='coerce')
+
+    with col1:
+        st.subheader("Over Goals HT")
+        over_ht_data = []
+        for t in [0.5, 1.5, 2.5]:
+            count = (df_prematch_ht["tot_goals_ht"] > t).sum()
+            perc = round((count / len(df_prematch_ht)) * 100, 2)
+            odd_min = round(100 / perc, 2) if perc > 0 else "-"
+            over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
+        st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+    with col2:
+        st.subheader("Over Goals FT")
+        over_ft_data = []
+        for t in [0.5, 1.5, 2.5]:
+            count = (df_prematch_ht["tot_goals_ft"] > t).sum()
+            perc = round((count / len(df_prematch_ht)) * 100, 2)
+            odd_min = round(100 / perc, 2) if perc > 0 else "-"
+            over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
+        st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+        
+    # BTTS
+    btts_ht = ((df_prematch_ht["gol_home_ht"] > 0) & (df_prematch_ht["gol_away_ht"] > 0)).sum()
+    perc_btts_ht = round(btts_ht / len(df_prematch_ht) * 100, 2) if len(df_prematch_ht) > 0 else 0
+    odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
+    st.subheader("BTTS SI HT")
+    st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
+
+    btts_ft = ((df_prematch_ht["gol_home_ft"] > 0) & (df_prematch_ht["gol_away_ft"] > 0)).sum()
+    perc_btts_ft = round(btts_ft / len(df_prematch_ht) * 100, 2) if len(df_prematch_ht) > 0 else 0
+    odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
+    st.subheader("BTTS SI FT")
+    st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
+
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
-    
 
 # --- SEZIONE 4: Analisi Timeband Dinamica (Minuto/Risultato) ---
 st.subheader("4. Analisi Timeband Dinamica")
