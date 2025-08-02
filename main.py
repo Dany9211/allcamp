@@ -735,3 +735,123 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
 
     else:
         st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
+
+# --- SEZIONE 5: Analisi Head-to-Head (H2H) ---
+st.subheader("5. Analisi Head-to-Head (H2H)")
+st.write("Seleziona due squadre per analizzare i loro scontri diretti.")
+
+# Recupera l'elenco completo di tutte le squadre disponibili nel dataset
+all_teams = sorted(list(set(df['home_team'].dropna().unique()) | set(df['away_team'].dropna().unique())))
+h2h_home_team = st.selectbox("Seleziona Squadra 1", ["Seleziona..."] + all_teams)
+h2h_away_team = st.selectbox("Seleziona Squadra 2", ["Seleziona..."] + all_teams)
+
+if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
+    if h2h_home_team == h2h_away_team:
+        st.warning("Seleziona due squadre diverse per l'analisi H2H.")
+    else:
+        # Filtra il DataFrame per trovare tutti i match tra le due squadre selezionate
+        h2h_df = df[((df['home_team'] == h2h_home_team) & (df['away_team'] == h2h_away_team)) |
+                    ((df['home_team'] == h2h_away_team) & (df['away_team'] == h2h_home_team))]
+        
+        if h2h_df.empty:
+            st.warning(f"Nessuna partita trovata tra {h2h_home_team} e {h2h_away_team}.")
+        else:
+            st.write(f"Analisi basata su **{len(h2h_df)}** scontri diretti tra {h2h_home_team} e {h2h_away_team}.")
+
+            # Esegui le stesse analisi pre-match, ma sul DataFrame H2H
+            st.subheader(f"Statistiche H2H Complete tra {h2h_home_team} e {h2h_away_team}")
+            
+            # Media gol
+            st.subheader("Media Gol (H2H)")
+            df_h2h_goals = h2h_df.copy()
+            df_h2h_goals["gol_home_ht"] = pd.to_numeric(df_h2h_goals["gol_home_ht"], errors='coerce')
+            df_h2h_goals["gol_away_ht"] = pd.to_numeric(df_h2h_goals["gol_away_ht"], errors='coerce')
+            df_h2h_goals["gol_home_ft"] = pd.to_numeric(df_h2h_goals["gol_home_ft"], errors='coerce')
+            df_h2h_goals["gol_away_ft"] = pd.to_numeric(df_h2h_goals["gol_away_ft"], errors='coerce')
+            avg_ht_goals = (df_h2h_goals["gol_home_ht"] + df_h2h_goals["gol_away_ht"]).mean()
+            avg_ft_goals = (df_h2h_goals["gol_home_ft"] + df_h2h_goals["gol_away_ft"]).mean()
+            avg_sh_goals = (df_h2h_goals["gol_home_ft"] + df_h2h_goals["gol_away_ft"] - df_h2h_goals["gol_home_ht"] - df_h2h_goals["gol_away_ht"]).mean()
+            st.table(pd.DataFrame({
+                "Periodo": ["HT", "FT", "SH"],
+                "Media Gol": [f"{avg_ht_goals:.2f}", f"{avg_ft_goals:.2f}", f"{avg_sh_goals:.2f}"]
+            }))
+            
+            # Risultati Esatti H2H
+            mostra_risultati_esatti(h2h_df, "risultato_ht", "HT H2H")
+            mostra_risultati_esatti(h2h_df, "risultato_ft", "FT H2H")
+
+            # WinRate H2H
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("WinRate HT H2H")
+                st.table(calcola_winrate(h2h_df, "risultato_ht"))
+            with col2:
+                st.subheader("WinRate FT H2H")
+                st.table(calcola_winrate(h2h_df, "risultato_ft"))
+
+            # Over Goals H2H
+            col1, col2 = st.columns(2)
+            df_h2h_goals["tot_goals_ht"] = pd.to_numeric(df_h2h_goals["gol_home_ht"], errors='coerce') + pd.to_numeric(df_h2h_goals["gol_away_ht"], errors='coerce')
+            df_h2h_goals["tot_goals_ft"] = pd.to_numeric(df_h2h_goals["gol_home_ft"], errors='coerce') + pd.to_numeric(df_h2h_goals["gol_away_ft"], errors='coerce')
+
+            with col1:
+                st.subheader("Over Goals HT H2H")
+                over_ht_data = []
+                for t in [0.5, 1.5, 2.5]:
+                    count = (df_h2h_goals["tot_goals_ht"] > t).sum()
+                    perc = round((count / len(df_h2h_goals)) * 100, 2)
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
+                st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+            with col2:
+                st.subheader("Over Goals FT H2H")
+                over_ft_data = []
+                for t in [0.5, 1.5, 2.5]:
+                    count = (df_h2h_goals["tot_goals_ft"] > t).sum()
+                    perc = round((count / len(df_h2h_goals)) * 100, 2)
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
+                st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+            # BTTS H2H
+            btts_ht = ((df_h2h_goals["gol_home_ht"] > 0) & (df_h2h_goals["gol_away_ht"] > 0)).sum()
+            perc_btts_ht = round(btts_ht / len(df_h2h_goals) * 100, 2) if len(df_h2h_goals) > 0 else 0
+            odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
+            st.subheader("BTTS SI HT H2H")
+            st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
+
+            btts_ft = ((df_h2h_goals["gol_home_ft"] > 0) & (df_h2h_goals["gol_away_ft"] > 0)).sum()
+            perc_btts_ft = round(btts_ft / len(df_h2h_goals) * 100, 2) if len(df_h2h_goals) > 0 else 0
+            odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
+            st.subheader("BTTS SI FT H2H")
+            st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
+
+            # First to Score H2H
+            st.subheader("First to Score (H2H)")
+            st.table(calcola_first_to_score(h2h_df))
+            
+            # To Score H2H
+            st.subheader("To Score (H2H)")
+            st.table(calcola_to_score(h2h_df))
+            
+            # Clean Sheet H2H
+            st.subheader("Clean Sheet (H2H)")
+            st.table(calcola_clean_sheet(h2h_df))
+            
+            # Combo Markets H2H
+            st.subheader("Combo Markets (H2H)")
+            st.table(calcola_combo_stats(h2h_df))
+            
+            # Analisi Rimonte H2H
+            st.subheader("Analisi Rimonte (H2H)")
+            rimonte_stats, squadre_rimonte = calcola_rimonte(h2h_df, "H2H")
+            if not rimonte_stats.empty:
+                st.table(rimonte_stats)
+                
+                st.markdown("**Squadre che hanno effettuato rimonte:**")
+                for tipo, squadre in squadre_rimonte.items():
+                    if squadre:
+                        st.markdown(f"**{tipo}:** {', '.join(squadre)}")
+            else:
+                st.warning("Nessuna rimonta trovata nel dataset filtrato.")
