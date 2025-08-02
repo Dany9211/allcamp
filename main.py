@@ -215,4 +215,5 @@ def analizza_da_minuto(df):
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
     st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
-if not filtered_df.empty and "risult
+if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
+    analizza_da_minuto(filtered_df)
