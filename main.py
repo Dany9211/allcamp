@@ -656,17 +656,35 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             st.write("**FT:**")
             st.table(calcola_winrate(df_target, "risultato_ft"))
 
+            # --- NUOVO CALCOLO OVER GOALS DINAMICO HT ---
+            st.subheader("Over Goals HT (Dinamica)")
+            over_ht_data_dynamic = []
+            df_target_goals["tot_goals_ht"] = df_target_goals["gol_home_ht"] + df_target_goals["gol_away_ht"]
+            for t in [0.5, 1.5, 2.5]:
+                count = (df_target_goals["tot_goals_ht"] > t).sum()
+                perc = round((count / len(df_target_goals)) * 100, 2)
+                odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                over_ht_data_dynamic.append([f"Over {t} HT", count, perc, odd_min])
+            st.table(pd.DataFrame(over_ht_data_dynamic, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
             # Over Goals FT
             st.subheader("Over Goals FT (Dinamica)")
             over_ft_data = []
+            df_target_goals["tot_goals_ft"] = df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"]
             for t in [0.5, 1.5, 2.5]:
-                count = (df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"] > t).sum()
+                count = (df_target_goals["tot_goals_ft"] > t).sum()
                 perc = round((count / len(df_target_goals)) * 100, 2)
                 odd_min = round(100 / perc, 2) if perc > 0 else "-"
                 over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
             st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
             
             # BTTS
+            btts_ht = ((df_target_goals["gol_home_ht"] > 0) & (df_target_goals["gol_away_ht"] > 0)).sum()
+            perc_btts_ht = round(btts_ht / len(df_target_goals) * 100, 2) if len(df_target_goals) > 0 else 0
+            odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
+            st.subheader("BTTS SI HT (Dinamica)")
+            st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
+
             btts_ft = ((df_target_goals["gol_home_ft"] > 0) & (df_target_goals["gol_away_ft"] > 0)).sum()
             perc_btts_ft = round(btts_ft / len(df_target_goals) * 100, 2) if len(df_target_goals) > 0 else 0
             odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
