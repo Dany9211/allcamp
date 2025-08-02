@@ -311,6 +311,69 @@ def calcola_next_goal(df_to_analyze, start_min, end_min):
     
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
 
+# --- NUOVE FUNZIONI PER ANALISI RIMONTE ---
+def calcola_rimonte(df_to_analyze, titolo_analisi):
+    if df_to_analyze.empty:
+        return pd.DataFrame(), [], []
+
+    partite_rimonta_parziale = []
+    partite_rimonta_completa = []
+    
+    df_rimonte = df_to_analyze.copy()
+    
+    # Aggiungi colonne per i gol HT e FT
+    df_rimonte["gol_home_ht"] = pd.to_numeric(df_rimonte["gol_home_ht"], errors='coerce')
+    df_rimonte["gol_away_ht"] = pd.to_numeric(df_rimonte["gol_away_ht"], errors='coerce')
+    df_rimonte["gol_home_ft"] = pd.to_numeric(df_rimonte["gol_home_ft"], errors='coerce')
+    df_rimonte["gol_away_ft"] = pd.to_numeric(df_rimonte["gol_away_ft"], errors='coerce')
+
+    def check_comeback(row):
+        # Rimonta Home
+        if row["gol_home_ht"] < row["gol_away_ht"] and row["gol_home_ft"] > row["gol_away_ft"]:
+            return "Completa - Home"
+        if row["gol_home_ht"] < row["gol_away_ht"] and row["gol_home_ft"] == row["gol_away_ft"]:
+            return "Parziale - Home"
+        # Rimonta Away
+        if row["gol_away_ht"] < row["gol_home_ht"] and row["gol_away_ft"] > row["gol_home_ft"]:
+            return "Completa - Away"
+        if row["gol_away_ht"] < row["gol_home_ht"] and row["gol_away_ft"] == row["gol_home_ft"]:
+            return "Parziale - Away"
+        return "Nessuna"
+
+    df_rimonte["rimonta"] = df_rimonte.apply(check_comeback, axis=1)
+    
+    # Filtra e conta i risultati
+    rimonte_completa_home = (df_rimonte["rimonta"] == "Completa - Home").sum()
+    rimonte_parziale_home = (df_rimonte["rimonta"] == "Parziale - Home").sum()
+    rimonte_completa_away = (df_rimonte["rimonta"] == "Completa - Away").sum()
+    rimonte_parziale_away = (df_rimonte["rimonta"] == "Parziale - Away").sum()
+
+    totale = len(df_rimonte)
+    
+    rimonte_data = [
+        ["Rimonta Completa (Home)", rimonte_completa_home, round((rimonte_completa_home / totale) * 100, 2) if totale > 0 else 0],
+        ["Rimonta Parziale (Home)", rimonte_parziale_home, round((rimonte_parziale_home / totale) * 100, 2) if totale > 0 else 0],
+        ["Rimonta Completa (Away)", rimonte_completa_away, round((rimonte_completa_away / totale) * 100, 2) if totale > 0 else 0],
+        ["Rimonta Parziale (Away)", rimonte_parziale_away, round((rimonte_parziale_away / totale) * 100, 2) if totale > 0 else 0]
+    ]
+
+    df_rimonte_stats = pd.DataFrame(rimonte_data, columns=["Tipo Rimonta", "Conteggio", "Percentuale %"])
+    df_rimonte_stats["Odd Minima"] = df_rimonte_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    # Crea la lista di squadre per ogni tipo di rimonta
+    squadre_rimonta_completa_home = df_rimonte[df_rimonte["rimonta"] == "Completa - Home"]["home_team"].tolist()
+    squadre_rimonta_parziale_home = df_rimonte[df_rimonte["rimonta"] == "Parziale - Home"]["home_team"].tolist()
+    squadre_rimonta_completa_away = df_rimonte[df_rimonte["rimonta"] == "Completa - Away"]["away_team"].tolist()
+    squadre_rimonta_parziale_away = df_rimonte[df_rimonte["rimonta"] == "Parziale - Away"]["away_team"].tolist()
+    
+    squadre_rimonte = {
+        "Rimonta Completa (Home)": squadre_rimonta_completa_home,
+        "Rimonta Parziale (Home)": squadre_rimonta_parziale_home,
+        "Rimonta Completa (Away)": squadre_rimonta_completa_away,
+        "Rimonta Parziale (Away)": squadre_rimonta_parziale_away
+    }
+
+    return df_rimonte_stats, squadre_rimonte
 
 # --- SEZIONE 1: Analisi Timeband per Campionato ---
 st.subheader("1. Analisi Timeband per Campionato")
@@ -424,6 +487,19 @@ if not filtered_df.empty:
     # First to Score
     st.subheader("First to Score (Pre-Match)")
     st.table(calcola_first_to_score(filtered_df))
+    
+    # Analisi Rimonte
+    st.subheader("Analisi Rimonte (Pre-Match)")
+    rimonte_stats, squadre_rimonte = calcola_rimonte(filtered_df, "Pre-Match")
+    if not rimonte_stats.empty:
+        st.table(rimonte_stats)
+        
+        st.markdown("**Squadre che hanno effettuato rimonte:**")
+        for tipo, squadre in squadre_rimonte.items():
+            if squadre:
+                st.markdown(f"**{tipo}:** {', '.join(squadre)}")
+    else:
+        st.warning("Nessuna rimonta trovata nel dataset filtrato.")
 
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
@@ -516,6 +592,18 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             # Next Goal nell'analisi dinamica
             st.subheader("Next Goal (Dinamica)")
             st.table(calcola_next_goal(df_target, start_min, end_min))
+            
+            # Analisi Rimonte Dinamica
+            st.subheader("Analisi Rimonte (Dinamica)")
+            rimonte_stats, squadre_rimonte = calcola_rimonte(df_target, "Dinamica")
+            if not rimonte_stats.empty:
+                st.table(rimonte_stats)
+                st.markdown("**Squadre che hanno effettuato rimonte:**")
+                for tipo, squadre in squadre_rimonte.items():
+                    if squadre:
+                        st.markdown(f"**{tipo}:** {', '.join(squadre)}")
+            else:
+                st.warning("Nessuna rimonta trovata nel dataset filtrato per questa analisi dinamica.")
             
             # Qui viene mostrata la timeband basata sull'analisi dinamica
             st.subheader("Distribuzione Gol per Timeframe (dinamica)")
