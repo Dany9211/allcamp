@@ -1,6 +1,3 @@
-Hai ragione, mi scuso per l'errore di sintassi nel codice precedente. Ho rimosso il testo non valido e ho corretto il file, aggiungendo la colonna per i gol segnati per ogni intervallo di tempo nelle funzioni `mostra_distribuzione_timeband` e `mostra_distribuzione_timeband_5min` come da te richiesto.
-
-```python
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -289,10 +286,12 @@ def mostra_distribuzione_timeband(df_to_analyze):
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
         partite_con_almeno_2_gol = 0
+        numero_gol_totali = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
             gol_in_timeframe = [g for g in gol_home + gol_away if start <= g <= end]
+            numero_gol_totali += len(gol_in_timeframe)
             if len(gol_in_timeframe) >= 1:
                 partite_con_gol += 1
             if len(gol_in_timeframe) >= 2:
@@ -304,8 +303,8 @@ def mostra_distribuzione_timeband(df_to_analyze):
         perc_2_plus = round((partite_con_almeno_2_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min_2_plus = round(100 / perc_2_plus, 2) if perc_2_plus > 0 else "-"
 
-        risultati.append([label, partite_con_gol, perc_1_plus, odd_min_1_plus, partite_con_almeno_2_gol, perc_2_plus, odd_min_2_plus])
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale % (1+)", "Odd Minima (1+)", "Partite con 2+ Gol", "Percentuale % (2+)", "Odd Minima (2+)"])
+        risultati.append([label, numero_gol_totali, partite_con_gol, perc_1_plus, odd_min_1_plus, partite_con_almeno_2_gol, perc_2_plus, odd_min_2_plus])
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Gol Segnati", "Partite con Gol", "Percentuale % (1+)", "Odd Minima (1+)", "Partite con 2+ Gol", "Percentuale % (2+)", "Odd Minima (2+)"])
     styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+)', 'Percentuale % (2+)'])
     st.dataframe(styled_df)
 
@@ -321,10 +320,12 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
         partite_con_almeno_2_gol = 0
+        numero_gol_totali = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
             gol_in_timeframe = [g for g in gol_home + gol_away if start <= g <= end]
+            numero_gol_totali += len(gol_in_timeframe)
             if len(gol_in_timeframe) >= 1:
                 partite_con_gol += 1
             if len(gol_in_timeframe) >= 2:
@@ -336,8 +337,8 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
         perc_2_plus = round((partite_con_almeno_2_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min_2_plus = round(100 / perc_2_plus, 2) if perc_2_plus > 0 else "-"
 
-        risultati.append([label, partite_con_gol, perc_1_plus, odd_min_1_plus, partite_con_almeno_2_gol, perc_2_plus, odd_min_2_plus])
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale % (1+)", "Odd Minima (1+)", "Partite con 2+ Gol", "Percentuale % (2+)", "Odd Minima (2+)"])
+        risultati.append([label, numero_gol_totali, partite_con_gol, perc_1_plus, odd_min_1_plus, partite_con_almeno_2_gol, perc_2_plus, odd_min_2_plus])
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Gol Segnati", "Partite con Gol", "Percentuale % (1+)", "Odd Minima (1+)", "Partite con 2+ Gol", "Percentuale % (2+)", "Odd Minima (2+)"])
     styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+)', 'Percentuale % (2+)'])
     st.dataframe(styled_df)
 
@@ -1302,4 +1303,3 @@ with st.expander("Configura e avvia il Backtest"):
                 st.metric("Odd Minima per profitto", f"{odd_minima:.2f}")
             elif numero_scommesse == 0:
                 st.info("Nessuna scommessa idonea trovata con i filtri e il mercato selezionati.")
-```
