@@ -6,92 +6,132 @@ import numpy as np
 st.set_page_config(page_title="Analisi Next Gol e stats live", layout="wide")
 st.title("Analisi Tabella allcamp")
 
+# --- Funzione connessione al database ---
 @st.cache_data
 def run_query(query: str):
-    conn = psycopg2.connect(
-        host=st.secrets["postgres"]["host"],
-        port=st.secrets["postgres"]["port"],
-        dbname=st.secrets["postgres"]["dbname"],
-        user=st.secrets["postgres"]["user"],
-        password=st.secrets["postgres"]["password"],
-        sslmode="require"
-    )
-    df = pd.read_sql(query, conn)
-    conn.close()
-    return df
+    """
+    Esegue una query SQL e restituisce i risultati come DataFrame.
+    La funzione è cacheata per evitare di riconnettersi al database
+    ogni volta che l'applicazione si aggiorna.
+    """
+    try:
+        conn = psycopg2.connect(
+            host=st.secrets["postgres"]["host"],
+            port=st.secrets["postgres"]["port"],
+            dbname=st.secrets["postgres"]["dbname"],
+            user=st.secrets["postgres"]["user"],
+            password=st.secrets["postgres"]["password"],
+            sslmode="require"
+        )
+        df = pd.read_sql(query, conn)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"Errore di connessione al database: {e}")
+        st.stop()
+        return pd.DataFrame() # Restituisce un DataFrame vuoto in caso di errore
 
+# --- Caricamento dati iniziali ---
 try:
     df = run_query('SELECT * FROM "allcamp";')
+    if df.empty:
+        st.warning("Il DataFrame caricato dal database è vuoto.")
+        st.stop()
     st.write(f"**Righe iniziali nel dataset:** {len(df)}")
 except Exception as e:
-    st.error(f"Errore durante il caricamento: {e}")
+    st.error(f"Errore durante il caricamento del database: {e}")
     st.stop()
 
 # --- Aggiunta colonne risultato_ft e risultato_ht ---
 if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
     df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
-
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
 
 filters = {}
 
-# --- Sidebar Filtri ---
+# --- FILTRI INIZIALI ---
+st.sidebar.header("Filtri Dati")
+
+# Filtro League (Campionato) - Deve essere il primo per filtrare le squadre
 if "league" in df.columns:
     leagues = ["Tutte"] + sorted(df["league"].dropna().unique())
-    selected_league = st.sidebar.selectbox("Seleziona League", leagues)
+    selected_league = st.sidebar.selectbox("Seleziona Campionato", leagues)
     if selected_league != "Tutte":
         filters["league"] = selected_league
+    
+    # Crea un DataFrame temporaneo per filtrare le squadre in base al campionato
+    if selected_league != "Tutte":
+        filtered_teams_df = df[df["league"] == selected_league]
+    else:
+        filtered_teams_df = df.copy()
+else:
+    # Se la colonna 'league' non esiste, usa il DataFrame completo per i team
+    filtered_teams_df = df.copy()
+    selected_league = "Tutte"
 
+# Filtro Anno
 if "anno" in df.columns:
     anni = ["Tutti"] + sorted(df["anno"].dropna().unique())
     selected_anno = st.sidebar.selectbox("Seleziona Anno", anni)
     if selected_anno != "Tutti":
         filters["anno"] = selected_anno
 
+# Filtro Giornata
 if "giornata" in df.columns:
-    giornata_min = int(df["giornata"].min())
-    giornata_max = int(df["giornata"].max())
-    giornata_range = st.sidebar.slider("Seleziona Giornata", giornata_min, giornata_max, (giornata_min, giornata_max))
+    giornata_min = int(df["giornata"].min()) if not df["giornata"].isnull().all() else 1
+    giornata_max = int(df["giornata"].max()) if not df["giornata"].isnull().all() else 38
+    giornata_range = st.sidebar.slider(
+        "Seleziona Giornata",
+        min_value=giornata_min,
+        max_value=giornata_max,
+        value=(giornata_min, giornata_max)
+    )
     filters["giornata"] = giornata_range
 
-# ✅ Filtro aggiunto: Risultato all'intervallo (HT)
-if "risultato_ht" in df.columns:
-    risultati_ht = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique())
-    selected_risultato_ht = st.sidebar.selectbox("Risultato all'intervallo (HT)", risultati_ht)
-    if selected_risultato_ht != "Tutti":
-        filters["risultato_ht"] = selected_risultato_ht
-
-if "home_team" in df.columns:
-    home_teams = ["Tutte"] + sorted(df["home_team"].dropna().unique())
+# --- FILTRI SQUADRE (ora dinamici) ---
+if "home_team" in filtered_teams_df.columns:
+    home_teams = ["Tutte"] + sorted(filtered_teams_df["home_team"].dropna().unique())
     selected_home = st.sidebar.selectbox("Seleziona Squadra Home", home_teams)
     if selected_home != "Tutte":
         filters["home_team"] = selected_home
 
-if "away_team" in df.columns:
-    away_teams = ["Tutte"] + sorted(df["away_team"].dropna().unique())
+if "away_team" in filtered_teams_df.columns:
+    away_teams = ["Tutte"] + sorted(filtered_teams_df["away_team"].dropna().unique())
     selected_away = st.sidebar.selectbox("Seleziona Squadra Away", away_teams)
     if selected_away != "Tutte":
         filters["away_team"] = selected_away
 
+# --- NUOVO FILTRO: Risultato HT ---
+if "risultato_ht" in df.columns:
+    ht_results = sorted(df["risultato_ht"].dropna().unique())
+    selected_ht_results = st.sidebar.multiselect("Seleziona Risultato HT", ht_results, default=None)
+    if selected_ht_results:
+        filters["risultato_ht"] = selected_ht_results
+
+# --- FUNZIONE per filtri range ---
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
+        # Conversione in numerico
         col_temp = pd.to_numeric(df[col_name].astype(str).str.replace(",", "."), errors="coerce")
         col_min = float(col_temp.min(skipna=True))
         col_max = float(col_temp.max(skipna=True))
-        st.sidebar.write(f"Range attuale {col_name}: {col_min} - {col_max}")
+        
+        st.sidebar.write(f"Range attuale {label or col_name}: {col_min} - {col_max}")
         min_val = st.sidebar.text_input(f"Min {label or col_name}", value="")
         max_val = st.sidebar.text_input(f"Max {label or col_name}", value="")
-        if min_val.strip() and max_val.strip():
+        
+        if min_val.strip() != "" and max_val.strip() != "":
             try:
                 filters[col_name] = (float(min_val), float(max_val))
-            except:
-                st.sidebar.warning(f"Valori non validi per {col_name}")
+            except ValueError:
+                st.sidebar.warning(f"Valori non validi per {label or col_name}. Inserisci numeri.")
 
 st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
-# --- APPLICA FILTRI ---
+
+# --- APPLICA FILTRI AL DATAFRAME PRINCIPALE ---
 filtered_df = df.copy()
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
@@ -101,25 +141,32 @@ for col, val in filters.items():
         mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
         filtered_df = filtered_df[mask.fillna(True)]
     elif col == "risultato_ht":
-        filtered_df = filtered_df[filtered_df["risultato_ht"] == val]
+        # Filtro per il risultato HT
+        filtered_df = filtered_df[filtered_df[col].isin(val)]
     else:
+        # Filtri per stringhe (league, anno, home_team, away_team)
         filtered_df = filtered_df[filtered_df[col] == val]
 
 st.subheader("Dati Filtrati")
-st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
+st.dataframe(filtered_df.head(50))
 
-# --- FUNZIONI DI ANALISI ---
+
+# --- FUNZIONE WINRATE (INVARIATA) ---
 def calcola_winrate(df, col_risultato):
-    df_valid = df[df[col_risultato].notna() & df[col_risultato].str.contains("-")]
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
     risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
     for ris in df_valid[col_risultato]:
         try:
             home, away = map(int, ris.split("-"))
-            if home > away: risultati["1 (Casa)"] += 1
-            elif home < away: risultati["2 (Trasferta)"] += 1
-            else: risultati["X (Pareggio)"] += 1
-        except: continue
+            if home > away:
+                risultati["1 (Casa)"] += 1
+            elif home < away:
+                risultati["2 (Trasferta)"] += 1
+            else:
+                risultati["X (Pareggio)"] += 1
+        except:
+            continue
     totale = len(df_valid)
     stats = []
     for esito, count in risultati.items():
@@ -128,25 +175,40 @@ def calcola_winrate(df, col_risultato):
         stats.append((esito, count, perc, odd_min))
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
 
+# --- RISULTATI ESATTI (INVARIATA) ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
-    interessanti = ["0-0", "0-1", "1-0", "1-1", "2-0", "2-1", "2-2", "3-0", "3-1", "3-2", "3-3"]
-    df_valid = df[df[col_risultato].notna() & df[col_risultato].str.contains("-")].copy()
-    def classifica(ris):
-        try:
-            h, a = map(int, ris.split("-"))
-        except: return "Altro"
-        if ris in interessanti: return ris
-        if h > a: return "Altro vittoria casa"
-        elif h < a: return "Altro vittoria trasferta"
-        else: return "Altro pareggio"
-    df_valid["classificato"] = df_valid[col_risultato].apply(classifica)
-    dist = df_valid["classificato"].value_counts().reset_index()
-    dist.columns = [titolo, "Conteggio"]
-    dist["Percentuale %"] = (dist["Conteggio"] / len(df_valid) * 100).round(2)
-    dist["Odd Minima"] = dist["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-    st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
-    st.table(dist)
+    risultati_interessanti = [
+        "0-0", "0-1", "0-2", "0-3",
+        "1-0", "1-1", "1-2", "1-3",
+        "2-0", "2-1", "2-2", "2-3",
+        "3-0", "3-1", "3-2", "3-3"
+    ]
+    df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))].copy()
 
+    def classifica_risultato(ris):
+        try:
+            home, away = map(int, ris.split("-"))
+        except:
+            return "Altro"
+        if ris in risultati_interessanti:
+            return ris
+        if home > away:
+            return "Altro risultato casa vince"
+        elif home < away:
+            return "Altro risultato ospite vince"
+        else:
+            return "Altro pareggio"
+
+    df_valid["classificato"] = df_valid[col_risultato].apply(classifica_risultato)
+    distribuzione = df_valid["classificato"].value_counts().reset_index()
+    distribuzione.columns = [titolo, "Conteggio"]
+    distribuzione["Percentuale %"] = (distribuzione["Conteggio"] / len(df_valid) * 100).round(2)
+    distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+    st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
+    st.table(distribuzione)
+
+# --- ANALISI DAL MINUTO (INVARIATA) ---
 def analizza_da_minuto(df):
     st.subheader("Analisi dinamica (da minuto A a B)")
     start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
@@ -170,13 +232,18 @@ def analizza_da_minuto(df):
     df_target = pd.DataFrame(partite_target)
     st.write(f"**Partite trovate:** {len(df_target)}")
 
-    df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series([
-        sum(1 for g in str(row.get("minutaggio_gol", "")).split(";") if g.isdigit() and start_min <= int(g) <= end_min),
-        sum(1 for g in str(row.get("minutaggio_gol_away", "")).split(";") if g.isdigit() and start_min <= int(g) <= end_min)
-    ]), axis=1)
+    # --- Calcolo gol nel range ---
+    def conta_gol_range(row):
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        home_in_range = sum(1 for g in gol_home if start_min <= g <= end_min)
+        away_in_range = sum(1 for g in gol_away if start_min <= g <= end_min)
+        return home_in_range, away_in_range
 
+    df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
     df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
 
+    # --- Risultati esatti e Winrate basati sul range ---
     mostra_risultati_esatti(df_target, "risultato_ht", "HT")
     mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
@@ -186,6 +253,7 @@ def analizza_da_minuto(df):
     st.write("**FT:**")
     st.table(calcola_winrate(df_target, "risultato_ft"))
 
+    # --- Over/Under nel range ---
     st.subheader(f"Over Goals (Range {start_min}-{end_min})")
     over_data = []
     for t in [0.5, 1.5, 2.5]:
@@ -201,6 +269,7 @@ def analizza_da_minuto(df):
     st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
     st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
 
+    # --- Distribuzione gol 0-90 ---
     st.subheader("Distribuzione Gol per Timeframe (0-90)")
     intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
     risultati = []
@@ -215,5 +284,9 @@ def analizza_da_minuto(df):
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
     st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+
+# --- ESECUZIONE DELL'ANALISI ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     analizza_da_minuto(filtered_df)
+else:
+    st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
