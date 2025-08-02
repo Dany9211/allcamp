@@ -205,6 +205,40 @@ def calcola_first_to_score(df_to_analyze):
     
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
 
+# --- NUOVA FUNZIONE CALCOLO FIRST TO SCORE HT ---
+def calcola_first_to_score_ht(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+    
+    risultati = {"Home Team": 0, "Away Team": 0, "No Goals": 0}
+    totale_partite = len(df_to_analyze)
+
+    for _, row in df_to_analyze.iterrows():
+        gol_home_str = str(row.get("minutaggio_gol", ""))
+        gol_away_str = str(row.get("minutaggio_gol_away", ""))
+
+        # Considera solo i gol segnati nel primo tempo (minuto <= 45)
+        gol_home = [int(x) for x in gol_home_str.split(";") if x.isdigit() and int(x) <= 45]
+        gol_away = [int(x) for x in gol_away_str.split(";") if x.isdigit() and int(x) <= 45]
+
+        min_home_goal = min(gol_home) if gol_home else float('inf')
+        min_away_goal = min(gol_away) if gol_away else float('inf')
+        
+        if min_home_goal < min_away_goal:
+            risultati["Home Team"] += 1
+        elif min_away_goal < min_home_goal:
+            risultati["Away Team"] += 1
+        else: 
+            if min_home_goal == float('inf'):
+                risultati["No Goals"] += 1
+
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    
+    return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
 
 # --- FUNZIONE RISULTATI ESATTI ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
@@ -319,7 +353,7 @@ def calcola_next_goal(df_to_analyze, start_min, end_min):
 # --- NUOVE FUNZIONI PER ANALISI RIMONTE ---
 def calcola_rimonte(df_to_analyze, titolo_analisi):
     if df_to_analyze.empty:
-        return pd.DataFrame(), [], []
+        return pd.DataFrame(), []
 
     partite_rimonta_parziale = []
     partite_rimonta_completa = []
@@ -380,31 +414,6 @@ def calcola_rimonte(df_to_analyze, titolo_analisi):
 
     return df_rimonte_stats, squadre_rimonte
 
-# --- NUOVA FUNZIONE PER CLEAN SHEET ---
-def calcola_clean_sheet(df_to_analyze):
-    if df_to_analyze.empty:
-        return pd.DataFrame()
-    
-    df_clean_sheet = df_to_analyze.copy()
-    
-    df_clean_sheet["gol_home_ft"] = pd.to_numeric(df_clean_sheet["gol_home_ft"], errors='coerce')
-    df_clean_sheet["gol_away_ft"] = pd.to_numeric(df_clean_sheet["gol_away_ft"], errors='coerce')
-    
-    home_clean_sheet_count = (df_clean_sheet["gol_away_ft"] == 0).sum()
-    away_clean_sheet_count = (df_clean_sheet["gol_home_ft"] == 0).sum()
-    
-    total_matches = len(df_clean_sheet)
-    
-    data = [
-        ["Clean Sheet (Casa)", home_clean_sheet_count, round((home_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0],
-        ["Clean Sheet (Trasferta)", away_clean_sheet_count, round((away_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0]
-    ]
-    
-    df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
-    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
-    
-    return df_stats
-
 # --- NUOVA FUNZIONE PER TO SCORE ---
 def calcola_to_score(df_to_analyze):
     if df_to_analyze.empty:
@@ -423,6 +432,157 @@ def calcola_to_score(df_to_analyze):
     data = [
         ["Home Team to Score", home_to_score_count, round((home_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0],
         ["Away Team to Score", away_to_score_count, round((away_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+    
+    df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER TO SCORE HT ---
+def calcola_to_score_ht(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+
+    df_to_score = df_to_analyze.copy()
+
+    df_to_score["gol_home_ht"] = pd.to_numeric(df_to_score["gol_home_ht"], errors='coerce')
+    df_to_score["gol_away_ht"] = pd.to_numeric(df_to_score["gol_away_ht"], errors='coerce')
+
+    home_to_score_count = (df_to_score["gol_home_ht"] > 0).sum()
+    away_to_score_count = (df_to_score["gol_away_ht"] > 0).sum()
+    
+    total_matches = len(df_to_score)
+    
+    data = [
+        ["Home Team to Score", home_to_score_count, round((home_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Away Team to Score", away_to_score_count, round((away_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+    
+    df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER BTTS HT ---
+def calcola_btts_ht(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+
+    df_btts_ht = df_to_analyze.copy()
+    df_btts_ht["gol_home_ht"] = pd.to_numeric(df_btts_ht["gol_home_ht"], errors='coerce')
+    df_btts_ht["gol_away_ht"] = pd.to_numeric(df_btts_ht["gol_away_ht"], errors='coerce')
+    
+    btts_count = ((df_btts_ht["gol_home_ht"] > 0) & (df_btts_ht["gol_away_ht"] > 0)).sum()
+    no_btts_count = ((df_btts_ht["gol_home_ht"] == 0) | (df_btts_ht["gol_away_ht"] == 0)).sum()
+    
+    total_matches = len(df_btts_ht)
+    
+    data = [
+        ["BTTS SI HT", btts_count, round((btts_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["BTTS NO HT", no_btts_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER BTTS FT ---
+def calcola_btts_ft(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+
+    df_btts_ft = df_to_analyze.copy()
+    df_btts_ft["gol_home_ft"] = pd.to_numeric(df_btts_ft["gol_home_ft"], errors='coerce')
+    df_btts_ft["gol_away_ft"] = pd.to_numeric(df_btts_ft["gol_away_ft"], errors='coerce')
+    
+    btts_count = ((df_btts_ft["gol_home_ft"] > 0) & (df_btts_ft["gol_away_ft"] > 0)).sum()
+    no_btts_count = ((df_btts_ft["gol_home_ft"] == 0) | (df_btts_ft["gol_away_ft"] == 0)).sum()
+    
+    total_matches = len(df_btts_ft)
+    
+    data = [
+        ["BTTS SI FT", btts_count, round((btts_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["BTTS NO FT", no_btts_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER BTTS DINAMICO ---
+def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+
+    btts_si_count = 0
+    btts_no_count = 0
+    total_matches = len(df_to_analyze)
+
+    for _, row in df_to_analyze.iterrows():
+        gol_home_str = str(row.get("minutaggio_gol", ""))
+        gol_away_str = str(row.get("minutaggio_gol_away", ""))
+        
+        gol_home_before = sum(1 for g in [int(x) for x in gol_home_str.split(";") if x.isdigit()] if g < start_min)
+        gol_away_before = sum(1 for g in [int(x) for x in gol_away_str.split(";") if x.isdigit()] if g < start_min)
+        
+        gol_home_ft = int(row.get("gol_home_ft", 0))
+        gol_away_ft = int(row.get("gol_away_ft", 0))
+        
+        # Logica per BTTS SI dinamico
+        btts_si = False
+        if "0-0" in risultati_correnti and gol_home_ft > 0 and gol_away_ft > 0:
+            btts_si = True
+        elif "1-0" in risultati_correnti and gol_away_ft > gol_away_before:
+            btts_si = True
+        elif "0-1" in risultati_correnti and gol_home_ft > gol_home_before:
+            btts_si = True
+        elif "1-1" in risultati_correnti:
+            btts_si = True
+        elif "2-0" in risultati_correnti and gol_away_ft > gol_away_before:
+            btts_si = True
+        elif "0-2" in risultati_correnti and gol_home_ft > gol_home_before:
+            btts_si = True
+        elif "2-1" in risultati_correnti and gol_away_ft > gol_away_before:
+            btts_si = True
+        elif "1-2" in risultati_correnti and gol_home_ft > gol_home_before:
+            btts_si = True
+            
+        if btts_si:
+            btts_si_count += 1
+        else:
+            btts_no_count += 1
+
+    data = [
+        ["BTTS SI (Dinamica)", btts_si_count, round((btts_si_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["BTTS NO (Dinamica)", btts_no_count, round((btts_no_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+
+    return df_stats
+
+# --- NUOVA FUNZIONE PER CLEAN SHEET ---
+def calcola_clean_sheet(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+    
+    df_clean_sheet = df_to_analyze.copy()
+    
+    df_clean_sheet["gol_home_ft"] = pd.to_numeric(df_clean_sheet["gol_home_ft"], errors='coerce')
+    df_clean_sheet["gol_away_ft"] = pd.to_numeric(df_clean_sheet["gol_away_ft"], errors='coerce')
+    
+    home_clean_sheet_count = (df_clean_sheet["gol_away_ft"] == 0).sum()
+    away_clean_sheet_count = (df_clean_sheet["gol_home_ft"] == 0).sum()
+    
+    total_matches = len(df_clean_sheet)
+    
+    data = [
+        ["Clean Sheet (Casa)", home_clean_sheet_count, round((home_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Clean Sheet (Trasferta)", away_clean_sheet_count, round((away_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0]
     ]
     
     df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
@@ -567,17 +727,16 @@ if not filtered_df.empty:
         st.dataframe(styled_over_ft)
         
     # BTTS
-    btts_ht = ((df_prematch_ht["gol_home_ht"] > 0) & (df_prematch_ht["gol_away_ht"] > 0)).sum()
-    perc_btts_ht = round(btts_ht / len(df_prematch_ht) * 100, 2) if len(df_prematch_ht) > 0 else 0
-    odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
-    st.subheader("BTTS SI HT")
-    st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
-
-    btts_ft = ((df_prematch_ht["gol_home_ft"] > 0) & (df_prematch_ht["gol_away_ft"] > 0)).sum()
-    perc_btts_ft = round(btts_ft / len(df_prematch_ht) * 100, 2) if len(df_prematch_ht) > 0 else 0
-    odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
-    st.subheader("BTTS SI FT")
-    st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
+    st.subheader("BTTS (Pre-Match)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### HT")
+        styled_df = calcola_btts_ht(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+    with col2:
+        st.write("### FT")
+        styled_df = calcola_btts_ft(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
 
     # First to Score
     st.subheader("First to Score (Pre-Match)")
@@ -621,9 +780,10 @@ st.subheader("4. Analisi Timeband Dinamica")
 with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
     if not filtered_df.empty:
         # --- ANALISI DAL MINUTO (integrata) ---
-        start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
+        start_min = st.slider("Seleziona minuto di partenza", 1, 90, 45)
         risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
-                                            ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2"], default=["0-0"])
+                                            sorted(df["risultato_ht"].unique()) if "risultato_ht" in df.columns else [],
+                                            default=["0-0"])
 
         partite_target = []
         for _, row in filtered_df.iterrows():
@@ -674,54 +834,61 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             styled_df_ft = calcola_winrate(df_target, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
             st.dataframe(styled_df_ft)
 
-            # --- NUOVO CALCOLO OVER GOALS DINAMICO HT ---
-            st.subheader("Over Goals HT (Dinamica)")
-            over_ht_data_dynamic = []
+            # Over Goals HT e FT
+            col1, col2 = st.columns(2)
             df_target_goals["tot_goals_ht"] = df_target_goals["gol_home_ht"] + df_target_goals["gol_away_ht"]
-            for t in [0.5, 1.5, 2.5]:
-                count = (df_target_goals["tot_goals_ht"] > t).sum()
-                perc = round((count / len(df_target_goals)) * 100, 2)
-                odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                over_ht_data_dynamic.append([f"Over {t} HT", count, perc, odd_min])
-            df_over_ht_dynamic = pd.DataFrame(over_ht_data_dynamic, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
-            styled_over_ht_dynamic = df_over_ht_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-            st.dataframe(styled_over_ht_dynamic)
-
-            # Over Goals FT
-            st.subheader("Over Goals FT (Dinamica)")
-            over_ft_data = []
             df_target_goals["tot_goals_ft"] = df_target_goals["gol_home_ft"] + df_target_goals["gol_away_ft"]
-            for t in [0.5, 1.5, 2.5]:
-                count = (df_target_goals["tot_goals_ft"] > t).sum()
-                perc = round((count / len(df_target_goals)) * 100, 2)
-                odd_min = round(100 / perc, 2) if perc > 0 else "-"
-                over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
-            df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
-            styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-            st.dataframe(styled_over_ft)
+            
+            with col1:
+                st.subheader("Over Goals HT (Dinamica)")
+                over_ht_data_dynamic = []
+                for t in [0.5, 1.5, 2.5]:
+                    count = (df_target_goals["tot_goals_ht"] > t).sum()
+                    perc = round((count / len(df_target_goals)) * 100, 2)
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    over_ht_data_dynamic.append([f"Over {t} HT", count, perc, odd_min])
+                df_over_ht_dynamic = pd.DataFrame(over_ht_data_dynamic, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+                styled_over_ht_dynamic = df_over_ht_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_over_ht_dynamic)
+            
+            with col2:
+                st.subheader("Over Goals FT (Dinamica)")
+                over_ft_data = []
+                for t in [0.5, 1.5, 2.5]:
+                    count = (df_target_goals["tot_goals_ft"] > t).sum()
+                    perc = round((count / len(df_target_goals)) * 100, 2)
+                    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                    over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
+                df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+                styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_over_ft)
             
             # BTTS
-            btts_ht = ((df_target_goals["gol_home_ht"] > 0) & (df_target_goals["gol_away_ht"] > 0)).sum()
-            perc_btts_ht = round(btts_ht / len(df_target_goals) * 100, 2) if len(df_target_goals) > 0 else 0
-            odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
-            st.subheader("BTTS SI HT (Dinamica)")
-            st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
-
-            btts_ft = ((df_target_goals["gol_home_ft"] > 0) & (df_target_goals["gol_away_ft"] > 0)).sum()
-            perc_btts_ft = round(btts_ft / len(df_target_goals) * 100, 2) if len(df_target_goals) > 0 else 0
-            odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
-            st.subheader("BTTS SI FT (Dinamica)")
-            st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
-
-            # First to Score nell'analisi dinamica
-            st.subheader("First to Score (Dinamica)")
-            styled_df = calcola_first_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.subheader("BTTS (Dinamica)")
+            styled_df = calcola_btts_dinamico(df_target, start_min, risultati_correnti).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
             
-            # To Score nell'analisi dinamica
-            st.subheader("To Score (Dinamica)")
-            styled_df = calcola_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-            st.dataframe(styled_df)
+            # First to Score nell'analisi dinamica (HT e FT)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("First to Score HT (Dinamica)")
+                styled_df = calcola_first_to_score_ht(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.subheader("First to Score FT (Dinamica)")
+                styled_df = calcola_first_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            
+            # To Score nell'analisi dinamica (HT e FT)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("To Score HT (Dinamica)")
+                styled_df = calcola_to_score_ht(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.subheader("To Score FT (Dinamica)")
+                styled_df = calcola_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
             
             # Clean Sheet nell'analisi dinamica
             st.subheader("Clean Sheet (Dinamica)")
@@ -735,7 +902,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             
             # Next Goal nell'analisi dinamica
             st.subheader("Next Goal (Dinamica)")
-            styled_df = calcola_next_goal(df_target, start_min, end_min).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            styled_df = calcola_next_goal(df_target, start_min, 90).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
             
             # Analisi Rimonte Dinamica
@@ -847,19 +1014,18 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                 df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
                 styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_over_ft)
-
+            
             # BTTS H2H
-            btts_ht = ((df_h2h_goals["gol_home_ht"] > 0) & (df_h2h_goals["gol_away_ht"] > 0)).sum()
-            perc_btts_ht = round(btts_ht / len(df_h2h_goals) * 100, 2) if len(df_h2h_goals) > 0 else 0
-            odd_btts_ht = round(100 / perc_btts_ht, 2) if perc_btts_ht > 0 else "-"
-            st.subheader("BTTS SI HT H2H")
-            st.write(f"BTTS SI: {btts_ht} ({perc_btts_ht}%) - Odd Minima: {odd_btts_ht}")
-
-            btts_ft = ((df_h2h_goals["gol_home_ft"] > 0) & (df_h2h_goals["gol_away_ft"] > 0)).sum()
-            perc_btts_ft = round(btts_ft / len(df_h2h_goals) * 100, 2) if len(df_h2h_goals) > 0 else 0
-            odd_btts_ft = round(100 / perc_btts_ft, 2) if perc_btts_ft > 0 else "-"
-            st.subheader("BTTS SI FT H2H")
-            st.write(f"BTTS SI: {btts_ft} ({perc_btts_ft}%) - Odd Minima: {odd_btts_ft}")
+            st.subheader("BTTS (H2H)")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### HT")
+                styled_df = calcola_btts_ht(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.write("### FT")
+                styled_df = calcola_btts_ft(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
 
             # First to Score H2H
             st.subheader("First to Score (H2H)")
