@@ -1187,50 +1187,45 @@ with st.expander("Configura e avvia il Backtest"):
     else:
         # Funzione per eseguire il backtest
         def esegui_backtest(df_to_analyze, market, strategy, stake):
+            
+            # Definizione dei mercati e delle colonne necessarie
+            market_map = {
+                "1 (Casa)": ("odd_home", lambda row: row["gol_home_ft"] > row["gol_away_ft"]),
+                "X (Pareggio)": ("odd_draw", lambda row: row["gol_home_ft"] == row["gol_away_ft"]),
+                "2 (Trasferta)": ("odd_away", lambda row: row["gol_home_ft"] < row["gol_away_ft"]),
+                "Over 2.5 FT": ("odd_over2_5", lambda row: (row["gol_home_ft"] + row["gol_away_ft"]) > 2.5),
+                "BTTS SI FT": ("odd_btts_si", lambda row: (row["gol_home_ft"] > 0 and row["gol_away_ft"] > 0))
+            }
+            
+            odd_col, win_condition = market_map[market]
+            
+            # Controllo che le colonne necessarie esistano nel DataFrame
+            required_cols = [odd_col, "risultato_ft", "gol_home_ft", "gol_away_ft"]
+            for col in required_cols:
+                if col not in df_to_analyze.columns:
+                    st.warning(f"Impossibile eseguire il backtest: la colonna '{col}' non è presente nel dataset.")
+                    return 0, 0, 0, 0.0, 0.0
+            
             vincite = 0
             perdite = 0
             profit_loss = 0.0
             numero_scommesse = 0
             
             # Rimuovi le righe con valori nulli nelle colonne chiave
-            df_clean = df_to_analyze.dropna(subset=['risultato_ft']).copy()
+            df_clean = df_to_analyze.dropna(subset=required_cols).copy()
             
-            # Assicurati che le colonne quote siano numeriche
-            df_clean["odd_home"] = pd.to_numeric(df_clean["odd_home"], errors='coerce').fillna(0)
-            df_clean["odd_draw"] = pd.to_numeric(df_clean["odd_draw"], errors='coerce').fillna(0)
-            df_clean["odd_away"] = pd.to_numeric(df_clean["odd_away"], errors='coerce').fillna(0)
-            df_clean["odd_over2_5"] = pd.to_numeric(df_clean["odd_over2_5"], errors='coerce').fillna(0)
-            df_clean["odd_btts_si"] = pd.to_numeric(df_clean["odd_btts_si"], errors='coerce').fillna(0)
-            
+            # Assicurati che le colonne quote e gol siano numeriche
+            df_clean[odd_col] = pd.to_numeric(df_clean[odd_col].astype(str).str.replace(",", "."), errors='coerce').fillna(0)
+            df_clean["gol_home_ft"] = pd.to_numeric(df_clean["gol_home_ft"], errors='coerce').fillna(0)
+            df_clean["gol_away_ft"] = pd.to_numeric(df_clean["gol_away_ft"], errors='coerce').fillna(0)
+
             for _, row in df_clean.iterrows():
                 try:
-                    home_goals, away_goals = map(int, str(row["risultato_ft"]).split("-"))
+                    odd = row[odd_col]
                     
-                    odd = 0
-                    is_winning = False
-                    
-                    if market == "1 (Casa)":
-                        odd = row["odd_home"]
-                        if home_goals > away_goals:
-                            is_winning = True
-                    elif market == "X (Pareggio)":
-                        odd = row["odd_draw"]
-                        if home_goals == away_goals:
-                            is_winning = True
-                    elif market == "2 (Trasferta)":
-                        odd = row["odd_away"]
-                        if home_goals < away_goals:
-                            is_winning = True
-                    elif market == "Over 2.5 FT":
-                        odd = row["odd_over2_5"]
-                        if home_goals + away_goals > 2.5:
-                            is_winning = True
-                    elif market == "BTTS SI FT":
-                        odd = row["odd_btts_si"]
-                        if home_goals > 0 and away_goals > 0:
-                            is_winning = True
-
                     if odd > 0:
+                        is_winning = win_condition(row)
+                        
                         if strategy == "Back":
                             if is_winning:
                                 vincite += 1
@@ -1271,13 +1266,13 @@ with st.expander("Configura e avvia il Backtest"):
         if st.button("Avvia Backtest"):
             vincite, perdite, numero_scommesse, profit_loss, roi = esegui_backtest(filtered_df, backtest_market, backtest_strategy, stake)
             
-            col_met1, col_met2, col_met3, col_met4 = st.columns(4)
-            col_met1.metric("Numero Scommesse", numero_scommesse)
-            col_met2.metric("Vincite", vincite)
-            col_met3.metric("Perdite", perdite)
-            col_met4.metric("Profitto/Perdita", f"{profit_loss:.2f} €")
-            
             if numero_scommesse > 0:
+                col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                col_met1.metric("Numero Scommesse", numero_scommesse)
+                col_met2.metric("Vincite", vincite)
+                col_met3.metric("Perdite", perdite)
+                col_met4.metric("Profitto/Perdita", f"{profit_loss:.2f} €")
                 st.metric("ROI", f"{roi:.2f} %")
-            else:
-                st.metric("ROI", "0.00 %")
+            elif numero_scommesse == 0:
+                st.info("Nessuna scommessa idonea trovata con i filtri e il mercato selezionati.")
+
