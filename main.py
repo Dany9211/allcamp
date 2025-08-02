@@ -29,7 +29,7 @@ def run_query(query: str):
     except Exception as e:
         st.error(f"Errore di connessione al database: {e}")
         st.stop()
-        return pd.DataFrame() # Restituisce un DataFrame vuoto in caso di errore
+        return pd.DataFrame()
 
 # --- Caricamento dati iniziali ---
 try:
@@ -66,7 +66,6 @@ if "league" in df.columns:
     else:
         filtered_teams_df = df.copy()
 else:
-    # Se la colonna 'league' non esiste, usa il DataFrame completo per i team
     filtered_teams_df = df.copy()
     selected_league = "Tutte"
 
@@ -96,7 +95,7 @@ if "home_team" in filtered_teams_df.columns:
     if selected_home != "Tutte":
         filters["home_team"] = selected_home
 
-if "away_team" in filtered_teams_df.columns:
+if "away_team" in filtered_teams.df.columns:
     away_teams = ["Tutte"] + sorted(filtered_teams_df["away_team"].dropna().unique())
     selected_away = st.sidebar.selectbox("Seleziona Squadra Away", away_teams)
     if selected_away != "Tutte":
@@ -112,7 +111,6 @@ if "risultato_ht" in df.columns:
 # --- FUNZIONE per filtri range ---
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
-        # Conversione in numerico
         col_temp = pd.to_numeric(df[col_name].astype(str).str.replace(",", "."), errors="coerce")
         col_min = float(col_temp.min(skipna=True))
         col_max = float(col_temp.max(skipna=True))
@@ -141,10 +139,8 @@ for col, val in filters.items():
         mask = pd.to_numeric(filtered_df[col], errors="coerce").between(val[0], val[1])
         filtered_df = filtered_df[mask.fillna(True)]
     elif col == "risultato_ht":
-        # Filtro per il risultato HT
         filtered_df = filtered_df[filtered_df[col].isin(val)]
     else:
-        # Filtri per stringhe (league, anno, home_team, away_team)
         filtered_df = filtered_df[filtered_df[col] == val]
 
 st.subheader("Dati Filtrati")
@@ -208,85 +204,109 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
     st.table(distribuzione)
 
-# --- ANALISI DAL MINUTO (INVARIATA) ---
-def analizza_da_minuto(df):
-    st.subheader("Analisi dinamica (da minuto A a B)")
-    start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
-    risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
-                                        ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2"], default=["0-0"])
-
-    partite_target = []
-    for _, row in df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        home_fino = sum(1 for g in gol_home if g < start_min)
-        away_fino = sum(1 for g in gol_away if g < start_min)
-        risultato_fino = f"{home_fino}-{away_fino}"
-        if risultato_fino in risultati_correnti:
-            partite_target.append(row)
-
-    if not partite_target:
-        st.warning(f"Nessuna partita con risultato selezionato al minuto {start_min}.")
+# --- FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND ---
+def mostra_distribuzione_timeband(df_to_analyze):
+    if df_to_analyze.empty:
+        st.warning("Il DataFrame per l'analisi è vuoto.")
         return
-
-    df_target = pd.DataFrame(partite_target)
-    st.write(f"**Partite trovate:** {len(df_target)}")
-
-    # --- Calcolo gol nel range ---
-    def conta_gol_range(row):
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        home_in_range = sum(1 for g in gol_home if start_min <= g <= end_min)
-        away_in_range = sum(1 for g in gol_away if start_min <= g <= end_min)
-        return home_in_range, away_in_range
-
-    df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
-    df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
-
-    # --- Risultati esatti e Winrate basati sul range ---
-    mostra_risultati_esatti(df_target, "risultato_ht", "HT")
-    mostra_risultati_esatti(df_target, "risultato_ft", "FT")
-
-    st.subheader(f"WinRate (Range {start_min}-{end_min})")
-    st.write("**HT:**")
-    st.table(calcola_winrate(df_target, "risultato_ht"))
-    st.write("**FT:**")
-    st.table(calcola_winrate(df_target, "risultato_ft"))
-
-    # --- Over/Under nel range ---
-    st.subheader(f"Over Goals (Range {start_min}-{end_min})")
-    over_data = []
-    for t in [0.5, 1.5, 2.5]:
-        count = (df_target["tot_goals_range"] > t).sum()
-        perc = round((count / len(df_target)) * 100, 2)
-        odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        over_data.append([f"Over {t} (range)", count, perc, odd_min])
-    st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
-
-    btts = ((df_target["home_range"] > 0) & (df_target["away_range"] > 0)).sum()
-    perc_btts = round(btts / len(df_target) * 100, 2)
-    odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
-    st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
-    st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
-
-    # --- Distribuzione gol 0-90 ---
-    st.subheader("Distribuzione Gol per Timeframe (0-90)")
     intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
     risultati = []
+    totale_partite = len(df_to_analyze)
     for (start, end) in intervalli:
         partite_con_gol = 0
-        for _, row in df_target.iterrows():
+        for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
             if any(start <= g <= end for g in gol_home + gol_away):
                 partite_con_gol += 1
-        perc = round((partite_con_gol / len(df_target)) * 100, 2)
+        perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
     st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 
-# --- ESECUZIONE DELL'ANALISI ---
-if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
-    analizza_da_minuto(filtered_df)
+
+# --- SEZIONE 1: Analisi Timeband per Campionato ---
+st.subheader("1. Analisi Timeband per Campionato")
+if selected_league != "Tutte":
+    df_league_only = df[df["league"] == selected_league]
+    st.write(f"Analisi basata su **{len(df_league_only)}** partite del campionato **{selected_league}**.")
+    mostra_distribuzione_timeband(df_league_only)
 else:
-    st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
+    st.write("Seleziona un campionato per visualizzare questa analisi.")
+
+
+# --- SEZIONE 2: Analisi Timeband per Campionato e Quote ---
+st.subheader("2. Analisi Timeband per Campionato e Quote")
+st.write(f"Analisi basata su **{len(filtered_df)}** partite filtrate da tutti i parametri della sidebar.")
+if not filtered_df.empty:
+    mostra_distribuzione_timeband(filtered_df)
+else:
+    st.warning("Nessuna partita corrisponde ai filtri selezionati.")
+
+
+# --- SEZIONE 3: Analisi Timeband Dinamica (Minuto/Risultato) ---
+st.subheader("3. Analisi Timeband Dinamica")
+with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
+    if not filtered_df.empty:
+        # --- ANALISI DAL MINUTO (integrata) ---
+        start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
+        risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
+                                            ["0-0", "1-0", "0-1", "1-1", "2-0", "0-2", "2-1", "1-2"], default=["0-0"])
+
+        partite_target = []
+        for _, row in filtered_df.iterrows():
+            gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+            gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+            home_fino = sum(1 for g in gol_home if g < start_min)
+            away_fino = sum(1 for g in gol_away if g < start_min)
+            risultato_fino = f"{home_fino}-{away_fino}"
+            if risultato_fino in risultati_correnti:
+                partite_target.append(row)
+
+        if not partite_target:
+            st.warning(f"Nessuna partita con risultato selezionato al minuto {start_min}.")
+        else:
+            df_target = pd.DataFrame(partite_target)
+            st.write(f"**Partite trovate:** {len(df_target)}")
+
+            # --- Calcolo gol nel range ---
+            def conta_gol_range(row):
+                gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+                gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+                home_in_range = sum(1 for g in gol_home if start_min <= g <= end_min)
+                away_in_range = sum(1 for g in gol_away if start_min <= g <= end_min)
+                return home_in_range, away_in_range
+
+            df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
+            df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
+
+            mostra_risultati_esatti(df_target, "risultato_ft", "FT")
+
+            st.subheader(f"WinRate (Range {start_min}-{end_min})")
+            st.write("**HT:**")
+            st.table(calcola_winrate(df_target, "risultato_ht"))
+            st.write("**FT:**")
+            st.table(calcola_winrate(df_target, "risultato_ft"))
+
+            st.subheader(f"Over Goals (Range {start_min}-{end_min})")
+            over_data = []
+            for t in [0.5, 1.5, 2.5]:
+                count = (df_target["tot_goals_range"] > t).sum()
+                perc = round((count / len(df_target)) * 100, 2)
+                odd_min = round(100 / perc, 2) if perc > 0 else "-"
+                over_data.append([f"Over {t} (range)", count, perc, odd_min])
+            st.table(pd.DataFrame(over_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+
+            btts = ((df_target["home_range"] > 0) & (df_target["away_range"] > 0)).sum()
+            perc_btts = round(btts / len(df_target) * 100, 2)
+            odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
+            st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
+            st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
+            
+            # Qui viene mostrata la timeband basata sull'analisi dinamica
+            st.subheader("Distribuzione Gol per Timeframe (0-90) **(dinamica)**")
+            mostra_distribuzione_timeband(df_target)
+
+    else:
+        st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
+
