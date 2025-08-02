@@ -206,7 +206,7 @@ def calcola_first_to_score(df_to_analyze):
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
 
 
-# --- RISULTATI ESATTI ---
+# --- FUNZIONE RISULTATI ESATTI ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
@@ -281,6 +281,36 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
         risultati.append([label, partite_con_gol, perc, odd_min])
     st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 
+# --- FUNZIONE NEXT GOAL ---
+def calcola_next_goal(df_to_analyze, start_min, end_min):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+    
+    risultati = {"Prossimo Gol: Home": 0, "Prossimo Gol: Away": 0, "Nessun prossimo gol": 0}
+    totale_partite = len(df_to_analyze)
+
+    for _, row in df_to_analyze.iterrows():
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+
+        next_home_goal = min([g for g in gol_home if g >= start_min] or [float('inf')])
+        next_away_goal = min([g for g in gol_away if g >= start_min] or [float('inf')])
+        
+        if next_home_goal < next_away_goal:
+            risultati["Prossimo Gol: Home"] += 1
+        elif next_away_goal < next_home_goal:
+            risultati["Prossimo Gol: Away"] += 1
+        else:
+            risultati["Nessun prossimo gol"] += 1
+
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    
+    return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+
 
 # --- SEZIONE 1: Analisi Timeband per Campionato ---
 st.subheader("1. Analisi Timeband per Campionato")
@@ -318,6 +348,7 @@ else:
 st.subheader("3. Analisi Pre-Match Completa (Filtri Sidebar)")
 st.write(f"Analisi completa basata su **{len(filtered_df)}** partite, considerando tutti i filtri del menu a sinistra.")
 if not filtered_df.empty:
+    mostra_risultati_esatti(filtered_df, "risultato_ht", "HT")
     mostra_risultati_esatti(filtered_df, "risultato_ft", "FT")
 
     # WinRate
@@ -400,6 +431,9 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             df_target = pd.DataFrame(partite_target)
             st.write(f"**Partite trovate:** {len(df_target)}")
 
+            mostra_risultati_esatti(df_target, "risultato_ht", "HT")
+            mostra_risultati_esatti(df_target, "risultato_ft", "FT")
+
             # --- Calcolo gol nel range ---
             def conta_gol_range(row):
                 gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
@@ -410,8 +444,6 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
 
             df_target[["home_range", "away_range"]] = df_target.apply(lambda row: pd.Series(conta_gol_range(row)), axis=1)
             df_target["tot_goals_range"] = df_target["home_range"] + df_target["away_range"]
-
-            mostra_risultati_esatti(df_target, "risultato_ft", "FT")
 
             st.subheader(f"WinRate (Range {start_min}-{end_min})")
             st.write("**HT:**")
@@ -437,6 +469,10 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             # First to Score nell'analisi dinamica
             st.subheader("First to Score (Dinamica)")
             st.table(calcola_first_to_score(df_target))
+            
+            # Next Goal nell'analisi dinamica
+            st.subheader("Next Goal (Dinamica)")
+            st.table(calcola_next_goal(df_target, start_min, end_min))
             
             # Qui viene mostrata la timeband basata sull'analisi dinamica
             st.subheader("Distribuzione Gol per Timeframe (dinamica)")
