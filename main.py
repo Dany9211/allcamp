@@ -95,7 +95,7 @@ if "home_team" in filtered_teams_df.columns:
     if selected_home != "Tutte":
         filters["home_team"] = selected_home
 
-if "away_team" in filtered_teams.df.columns:
+if "away_team" in filtered_teams_df.columns:
     away_teams = ["Tutte"] + sorted(filtered_teams_df["away_team"].dropna().unique())
     selected_away = st.sidebar.selectbox("Seleziona Squadra Away", away_teams)
     if selected_away != "Tutte":
@@ -309,4 +309,3 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
 
     else:
         st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
-
