@@ -62,23 +62,19 @@ if "giornata" in df.columns:
     )
     filters["giornata"] = giornata_range
 
+# --- FILTRO SQUADRA HOME ---
 if "home_team" in df.columns:
     home_teams = ["Tutte"] + sorted(df["home_team"].dropna().unique())
     selected_home = st.sidebar.selectbox("Seleziona Squadra Home", home_teams)
     if selected_home != "Tutte":
         filters["home_team"] = selected_home
 
+# --- FILTRO SQUADRA AWAY ---
 if "away_team" in df.columns:
     away_teams = ["Tutte"] + sorted(df["away_team"].dropna().unique())
     selected_away = st.sidebar.selectbox("Seleziona Squadra Away", away_teams)
     if selected_away != "Tutte":
         filters["away_team"] = selected_away
-
-if "risultato_ht" in df.columns:
-    risultati_ht = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique())
-    selected_ris_ht = st.sidebar.selectbox("Seleziona Risultato HT", risultati_ht)
-    if selected_ris_ht != "Tutti":
-        filters["risultato_ht"] = selected_ris_ht
 
 def add_range_filter(col_name, label=None):
     if col_name in df.columns:
@@ -98,7 +94,7 @@ st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
 
-# --- Applica filtri ---
+# --- APPLICA FILTRI ---
 filtered_df = df.copy()
 for col, val in filters.items():
     if col in ["odd_home", "odd_draw", "odd_away"]:
@@ -114,9 +110,9 @@ st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 
-# --- Analisi distribuzione gol ogni 5 minuti ---
-def distribuzione_5min(df):
-    st.subheader("Distribuzione Gol ogni 5 minuti (0-90+)")
+# --- Analisi da minuto con distribuzione 5 min ---
+def analizza_da_minuto(df):
+    st.subheader("Distribuzione Gol ogni 5 minuti (1-90+)")
     timebands = [(1, 5), (6, 10), (11, 15), (16, 20), (21, 25), (26, 30), (31, 35), (36, 40), (41, 45),
                  (46, 50), (51, 55), (56, 60), (61, 65), (66, 70), (71, 75), (76, 80), (81, 85), (86, 90), (91, 120)]
     risultati = []
@@ -135,6 +131,5 @@ def distribuzione_5min(df):
 
     st.table(pd.DataFrame(risultati, columns=["Timeframe (min)", "Partite con Gol", "Percentuale %", "Odd Minima"]))
 
-# --- ESECUZIONE ---
 if not filtered_df.empty:
-    distribuzione_5min(filtered_df)
+    analizza_da_minuto(filtered_df)
