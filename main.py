@@ -516,12 +516,11 @@ def calcola_btts_ft(df_to_analyze):
 # --- NUOVA FUNZIONE PER BTTS DINAMICO ---
 def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
     if df_to_analyze.empty:
-        return pd.DataFrame()
+        return pd.DataFrame(columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
 
-    btts_si_count = 0
-    btts_no_count = 0
     total_matches = len(df_to_analyze)
-
+    btts_si_count = 0
+    
     for _, row in df_to_analyze.iterrows():
         gol_home_str = str(row.get("minutaggio_gol", ""))
         gol_away_str = str(row.get("minutaggio_gol_away", ""))
@@ -553,12 +552,12 @@ def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
             
         if btts_si:
             btts_si_count += 1
-        else:
-            btts_no_count += 1
+
+    btts_no_count = total_matches - btts_si_count
 
     data = [
         ["BTTS SI (Dinamica)", btts_si_count, round((btts_si_count / total_matches) * 100, 2) if total_matches > 0 else 0],
-        ["BTTS NO (Dinamica)", btts_no_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+        ["BTTS NO (Dinamica)", btts_no_count, round((btts_no_count / total_matches) * 100, 2) if total_matches > 0 else 0]
     ]
 
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
