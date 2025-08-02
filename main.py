@@ -148,7 +148,7 @@ st.write(f"**Righe visualizzate:** {len(filtered_df)}")
 st.dataframe(filtered_df.head(50))
 
 
-# --- FUNZIONE WINRATE (INVARIATA) ---
+# --- FUNZIONE WINRATE ---
 def calcola_winrate(df, col_risultato):
     df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
     risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
@@ -171,7 +171,7 @@ def calcola_winrate(df, col_risultato):
         stats.append((esito, count, perc, odd_min))
     return pd.DataFrame(stats, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
 
-# --- RISULTATI ESATTI (INVARIATA) ---
+# --- RISULTATI ESATTI ---
 def mostra_risultati_esatti(df, col_risultato, titolo):
     risultati_interessanti = [
         "0-0", "0-1", "0-2", "0-3",
@@ -204,12 +204,32 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
     st.table(distribuzione)
 
-# --- FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND ---
+# --- FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND (15 MIN) ---
 def mostra_distribuzione_timeband(df_to_analyze):
     if df_to_analyze.empty:
-        st.warning("Il DataFrame per l'analisi è vuoto.")
+        st.warning("Il DataFrame per l'analisi a 15 minuti è vuoto.")
         return
     intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
+    risultati = []
+    totale_partite = len(df_to_analyze)
+    for (start, end) in intervalli:
+        partite_con_gol = 0
+        for _, row in df_to_analyze.iterrows():
+            gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+            gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+            if any(start <= g <= end for g in gol_home + gol_away):
+                partite_con_gol += 1
+        perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
+    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+
+# --- NUOVA FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND (5 MIN) ---
+def mostra_distribuzione_timeband_5min(df_to_analyze):
+    if df_to_analyze.empty:
+        st.warning("Il DataFrame per l'analisi a 5 minuti è vuoto.")
+        return
+    intervalli = [(0,5), (6,10), (11,15), (16,20), (21,25), (26,30), (31,35), (36,40), (41,45), (46,50), (51,55), (56,60), (61,65), (66,70), (71,75), (76,80), (81,85), (86,90)]
     risultati = []
     totale_partite = len(df_to_analyze)
     for (start, end) in intervalli:
@@ -230,22 +250,58 @@ st.subheader("1. Analisi Timeband per Campionato")
 if selected_league != "Tutte":
     df_league_only = df[df["league"] == selected_league]
     st.write(f"Analisi basata su **{len(df_league_only)}** partite del campionato **{selected_league}**.")
+    st.write("---")
+    st.write("**Distribuzione Gol per Timeframe (15min)**")
     mostra_distribuzione_timeband(df_league_only)
+    st.write("**Distribuzione Gol per Timeframe (5min)**")
+    mostra_distribuzione_timeband_5min(df_league_only)
 else:
     st.write("Seleziona un campionato per visualizzare questa analisi.")
-
 
 # --- SEZIONE 2: Analisi Timeband per Campionato e Quote ---
 st.subheader("2. Analisi Timeband per Campionato e Quote")
 st.write(f"Analisi basata su **{len(filtered_df)}** partite filtrate da tutti i parametri della sidebar.")
 if not filtered_df.empty:
+    st.write("---")
+    st.write("**Distribuzione Gol per Timeframe (15min)**")
     mostra_distribuzione_timeband(filtered_df)
+    st.write("**Distribuzione Gol per Timeframe (5min)**")
+    mostra_distribuzione_timeband_5min(filtered_df)
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati.")
 
+# --- NUOVA SEZIONE: Statistiche Pre-Match HT Over/Under ---
+st.subheader("3. Statistiche Pre-Match HT")
+# Crea un DataFrame per l'analisi pre-match, escludendo il filtro 'risultato_ht'
+df_prematch_ht = df.copy()
+prematch_filters = {k: v for k, v in filters.items() if k != 'risultato_ht'}
+for col, val in prematch_filters.items():
+    if col in ["odd_home", "odd_draw", "odd_away"]:
+        mask = pd.to_numeric(df_prematch_ht[col].astype(str).str.replace(",", "."), errors="coerce").between(val[0], val[1])
+        df_prematch_ht = df_prematch_ht[mask.fillna(True)]
+    elif col == "giornata":
+        mask = pd.to_numeric(df_prematch_ht[col], errors="coerce").between(val[0], val[1])
+        df_prematch_ht = df_prematch_ht[mask.fillna(True)]
+    else:
+        df_prematch_ht = df_prematch_ht[df_prematch_ht[col] == val]
 
-# --- SEZIONE 3: Analisi Timeband Dinamica (Minuto/Risultato) ---
-st.subheader("3. Analisi Timeband Dinamica")
+if not df_prematch_ht.empty:
+    st.write(f"Analisi basata su **{len(df_prematch_ht)}** partite (escluso il filtro Risultato HT).")
+    df_prematch_ht["tot_goals_ht"] = pd.to_numeric(df_prematch_ht["gol_home_ht"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ht"], errors='coerce')
+    
+    over_ht_data = []
+    for t in [0.5, 1.5, 2.5]:
+        count = (df_prematch_ht["tot_goals_ht"] > t).sum()
+        perc = round((count / len(df_prematch_ht)) * 100, 2)
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
+    st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+else:
+    st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
+    
+
+# --- SEZIONE 4: Analisi Timeband Dinamica (Minuto/Risultato) ---
+st.subheader("4. Analisi Timeband Dinamica")
 with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
     if not filtered_df.empty:
         # --- ANALISI DAL MINUTO (integrata) ---
@@ -304,8 +360,10 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
             
             # Qui viene mostrata la timeband basata sull'analisi dinamica
-            st.subheader("Distribuzione Gol per Timeframe (0-90) **(dinamica)**")
+            st.subheader("Distribuzione Gol per Timeframe (15min) **(dinamica)**")
             mostra_distribuzione_timeband(df_target)
+            st.subheader("Distribuzione Gol per Timeframe (5min) **(dinamica)**")
+            mostra_distribuzione_timeband_5min(df_target)
 
     else:
         st.warning("Il dataset filtrato è vuoto o mancano le colonne necessarie per l'analisi.")
