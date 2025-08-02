@@ -781,8 +781,9 @@ st.subheader("4. Analisi Timeband Dinamica")
 with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
     if not filtered_df.empty:
         # --- ANALISI DAL MINUTO (integrata) ---
-        start_min = st.slider("Seleziona minuto di partenza", 1, 90, 45)
-        end_min = st.slider("Seleziona minuto finale", start_min, 90, 90)
+        # Cursore unico per il range di minuti
+        min_range = st.slider("Seleziona Range Minuti", 1, 90, (45, 90))
+        start_min, end_min = min_range[0], min_range[1]
 
         risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
                                             sorted(df["risultato_ht"].unique()) if "risultato_ht" in df.columns else [],
