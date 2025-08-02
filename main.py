@@ -375,6 +375,90 @@ def calcola_rimonte(df_to_analyze, titolo_analisi):
 
     return df_rimonte_stats, squadre_rimonte
 
+# --- NUOVA FUNZIONE PER CLEAN SHEET ---
+def calcola_clean_sheet(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+    
+    df_clean_sheet = df_to_analyze.copy()
+    
+    df_clean_sheet["gol_home_ft"] = pd.to_numeric(df_clean_sheet["gol_home_ft"], errors='coerce')
+    df_clean_sheet["gol_away_ft"] = pd.to_numeric(df_clean_sheet["gol_away_ft"], errors='coerce')
+    
+    home_clean_sheet_count = (df_clean_sheet["gol_away_ft"] == 0).sum()
+    away_clean_sheet_count = (df_clean_sheet["gol_home_ft"] == 0).sum()
+    
+    total_matches = len(df_clean_sheet)
+    
+    data = [
+        ["Clean Sheet (Casa)", home_clean_sheet_count, round((home_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Clean Sheet (Trasferta)", away_clean_sheet_count, round((away_clean_sheet_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+    
+    df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER TO SCORE ---
+def calcola_to_score(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+
+    df_to_score = df_to_analyze.copy()
+
+    df_to_score["gol_home_ft"] = pd.to_numeric(df_to_score["gol_home_ft"], errors='coerce')
+    df_to_score["gol_away_ft"] = pd.to_numeric(df_to_score["gol_away_ft"], errors='coerce')
+
+    home_to_score_count = (df_to_score["gol_home_ft"] > 0).sum()
+    away_to_score_count = (df_to_score["gol_away_ft"] > 0).sum()
+    
+    total_matches = len(df_to_score)
+    
+    data = [
+        ["Home Team to Score", home_to_score_count, round((home_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Away Team to Score", away_to_score_count, round((away_to_score_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+    
+    df_stats = pd.DataFrame(data, columns=["Esito", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+# --- NUOVA FUNZIONE PER COMBO MARKETS ---
+def calcola_combo_stats(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+        
+    df_combo = df_to_analyze.copy()
+
+    df_combo["gol_home_ft"] = pd.to_numeric(df_combo["gol_home_ft"], errors='coerce')
+    df_combo["gol_away_ft"] = pd.to_numeric(df_combo["gol_away_ft"], errors='coerce')
+    
+    df_combo["tot_goals_ft"] = df_combo["gol_home_ft"] + df_combo["gol_away_ft"]
+    
+    # BTTS SI + Over 2.5
+    btts_over_2_5_count = ((df_combo["gol_home_ft"] > 0) & (df_combo["gol_away_ft"] > 0) & (df_combo["tot_goals_ft"] > 2.5)).sum()
+    
+    # Home Win + Over 2.5
+    home_win_over_2_5_count = ((df_combo["gol_home_ft"] > df_combo["gol_away_ft"]) & (df_combo["tot_goals_ft"] > 2.5)).sum()
+    
+    # Away Win + Over 2.5
+    away_win_over_2_5_count = ((df_combo["gol_away_ft"] > df_combo["gol_home_ft"]) & (df_combo["tot_goals_ft"] > 2.5)).sum()
+    
+    total_matches = len(df_combo)
+    
+    data = [
+        ["BTTS SI + Over 2.5", btts_over_2_5_count, round((btts_over_2_5_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Casa vince + Over 2.5", home_win_over_2_5_count, round((home_win_over_2_5_count / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["Ospite vince + Over 2.5", away_win_over_2_5_count, round((away_win_over_2_5_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
 # --- SEZIONE 1: Analisi Timeband per Campionato ---
 st.subheader("1. Analisi Timeband per Campionato")
 if selected_league != "Tutte":
@@ -488,6 +572,18 @@ if not filtered_df.empty:
     st.subheader("First to Score (Pre-Match)")
     st.table(calcola_first_to_score(filtered_df))
     
+    # To Score
+    st.subheader("To Score (Pre-Match)")
+    st.table(calcola_to_score(filtered_df))
+    
+    # Clean Sheet
+    st.subheader("Clean Sheet (Pre-Match)")
+    st.table(calcola_clean_sheet(filtered_df))
+    
+    # Combo Markets
+    st.subheader("Combo Markets (Pre-Match)")
+    st.table(calcola_combo_stats(filtered_df))
+    
     # Analisi Rimonte
     st.subheader("Analisi Rimonte (Pre-Match)")
     rimonte_stats, squadre_rimonte = calcola_rimonte(filtered_df, "Pre-Match")
@@ -588,6 +684,18 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             # First to Score nell'analisi dinamica
             st.subheader("First to Score (Dinamica)")
             st.table(calcola_first_to_score(df_target))
+            
+            # To Score nell'analisi dinamica
+            st.subheader("To Score (Dinamica)")
+            st.table(calcola_to_score(df_target))
+            
+            # Clean Sheet nell'analisi dinamica
+            st.subheader("Clean Sheet (Dinamica)")
+            st.table(calcola_clean_sheet(df_target))
+            
+            # Combo Markets nell'analisi dinamica
+            st.subheader("Combo Markets (Dinamica)")
+            st.table(calcola_combo_stats(df_target))
             
             # Next Goal nell'analisi dinamica
             st.subheader("Next Goal (Dinamica)")
