@@ -558,7 +558,7 @@ def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
 
     data = [
         ["BTTS SI (Dinamica)", btts_si_count, round((btts_si_count / total_matches) * 100, 2) if total_matches > 0 else 0],
-        ["BTTS NO (Dinamica)", btts_no_count, round((btts_no_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+        ["BTTS NO (Dinamica)", btts_no_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
     ]
 
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
@@ -623,6 +623,33 @@ def calcola_combo_stats(df_to_analyze):
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
     df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
     
+    return df_stats
+
+# --- NUOVA FUNZIONE PER MULTI GOL ---
+def calcola_multi_gol(df_to_analyze, col_gol, titolo):
+    if df_to_analyze.empty:
+        return pd.DataFrame()
+    
+    df_multi_gol = df_to_analyze.copy()
+    df_multi_gol[col_gol] = pd.to_numeric(df_multi_gol[col_gol], errors='coerce')
+    
+    total_matches = len(df_multi_gol)
+    
+    multi_gol_ranges = [
+        ("0-1", lambda x: (x >= 0) & (x <= 1)),
+        ("1-2", lambda x: (x >= 1) & (x <= 2)),
+        ("2-3", lambda x: (x >= 2) & (x <= 3)),
+        ("3+", lambda x: (x >= 3))
+    ]
+    
+    data = []
+    for label, condition in multi_gol_ranges:
+        count = df_multi_gol[condition(df_multi_gol[col_gol])].shape[0]
+        perc = round((count / total_matches) * 100, 2) if total_matches > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        data.append([f"Multi Gol {label}", count, perc, odd_min])
+        
+    df_stats = pd.DataFrame(data, columns=[f"Mercato ({titolo})", "Conteggio", "Percentuale %", "Odd Minima"])
     return df_stats
 
 # --- SEZIONE 1: Analisi Timeband per Campionato ---
@@ -706,7 +733,7 @@ if not filtered_df.empty:
     with col1:
         st.subheader("Over Goals HT")
         over_ht_data = []
-        for t in [0.5, 1.5, 2.5]:
+        for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
             count = (df_prematch_ht["tot_goals_ht"] > t).sum()
             perc = round((count / len(df_prematch_ht)) * 100, 2)
             odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -718,7 +745,7 @@ if not filtered_df.empty:
     with col2:
         st.subheader("Over Goals FT")
         over_ft_data = []
-        for t in [0.5, 1.5, 2.5]:
+        for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
             count = (df_prematch_ht["tot_goals_ft"] > t).sum()
             perc = round((count / len(df_prematch_ht)) * 100, 2)
             odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -737,6 +764,18 @@ if not filtered_df.empty:
     with col2:
         st.write("### FT")
         styled_df = calcola_btts_ft(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+
+    # Multi Gol
+    st.subheader("Multi Gol (Pre-Match)")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### Casa")
+        styled_df = calcola_multi_gol(filtered_df, "gol_home_ft", "Home").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+    with col2:
+        st.write("### Trasferta")
+        styled_df = calcola_multi_gol(filtered_df, "gol_away_ft", "Away").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
 
     # First to Score
@@ -846,7 +885,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             with col1:
                 st.subheader("Over Goals HT (Dinamica)")
                 over_ht_data_dynamic = []
-                for t in [0.5, 1.5, 2.5]:
+                for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
                     count = (df_target_goals["tot_goals_ht"] > t).sum()
                     perc = round((count / len(df_target_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -858,7 +897,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             with col2:
                 st.subheader("Over Goals FT (Dinamica)")
                 over_ft_data = []
-                for t in [0.5, 1.5, 2.5]:
+                for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
                     count = (df_target_goals["tot_goals_ft"] > t).sum()
                     perc = round((count / len(df_target_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -871,6 +910,18 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             st.subheader("BTTS (Dinamica)")
             styled_df = calcola_btts_dinamico(df_target, start_min, risultati_correnti).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
+
+            # Multi Gol
+            st.subheader("Multi Gol (Dinamica)")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### Casa")
+                styled_df = calcola_multi_gol(df_target, "gol_home_ft", "Home").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.write("### Trasferta")
+                styled_df = calcola_multi_gol(df_target, "gol_away_ft", "Away").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
             
             # First to Score nell'analisi dinamica (HT e FT)
             col1, col2 = st.columns(2)
@@ -949,6 +1000,7 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
         st.warning("Seleziona due squadre diverse per l'analisi H2H.")
     else:
         # Filtra il DataFrame per trovare tutti i match tra le due squadre selezionate
+        # NOTA: I filtri per le quote della sidebar non vengono applicati qui per avere il dataset H2H completo
         h2h_df = df[((df['home_team'] == h2h_home_team) & (df['away_team'] == h2h_away_team)) |
                     ((df['home_team'] == h2h_away_team) & (df['away_team'] == h2h_home_team))]
         
@@ -998,7 +1050,7 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             with col1:
                 st.subheader("Over Goals HT H2H")
                 over_ht_data = []
-                for t in [0.5, 1.5, 2.5]:
+                for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
                     count = (df_h2h_goals["tot_goals_ht"] > t).sum()
                     perc = round((count / len(df_h2h_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -1010,7 +1062,7 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             with col2:
                 st.subheader("Over Goals FT H2H")
                 over_ft_data = []
-                for t in [0.5, 1.5, 2.5]:
+                for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
                     count = (df_h2h_goals["tot_goals_ft"] > t).sum()
                     perc = round((count / len(df_h2h_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
@@ -1029,6 +1081,18 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             with col2:
                 st.write("### FT")
                 styled_df = calcola_btts_ft(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+
+            # Multi Gol H2H
+            st.subheader("Multi Gol (H2H)")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### Casa")
+                styled_df = calcola_multi_gol(h2h_df, "gol_home_ft", "Home").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.write("### Trasferta")
+                styled_df = calcola_multi_gol(h2h_df, "gol_away_ft", "Away").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
 
             # First to Score H2H
