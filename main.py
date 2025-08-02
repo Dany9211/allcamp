@@ -1193,7 +1193,7 @@ with st.expander("Configura e avvia il Backtest"):
                 "1 (Casa)": ("odd_home", lambda row: row["gol_home_ft"] > row["gol_away_ft"]),
                 "X (Pareggio)": ("odd_draw", lambda row: row["gol_home_ft"] == row["gol_away_ft"]),
                 "2 (Trasferta)": ("odd_away", lambda row: row["gol_home_ft"] < row["gol_away_ft"]),
-                "Over 2.5 FT": ("odd_over2_5", lambda row: (row["gol_home_ft"] + row["gol_away_ft"]) > 2.5),
+                "Over 2.5 FT": ("odd_over_2_5", lambda row: (row["gol_home_ft"] + row["gol_away_ft"]) > 2.5),
                 "BTTS SI FT": ("odd_btts_si", lambda row: (row["gol_home_ft"] > 0 and row["gol_away_ft"] > 0))
             }
             
@@ -1204,7 +1204,7 @@ with st.expander("Configura e avvia il Backtest"):
             for col in required_cols:
                 if col not in df_to_analyze.columns:
                     st.warning(f"Impossibile eseguire il backtest: la colonna '{col}' non è presente nel dataset.")
-                    return 0, 0, 0, 0.0, 0.0
+                    return 0, 0, 0, 0.0, 0.0, 0.0, 0.0
             
             vincite = 0
             perdite = 0
@@ -1249,8 +1249,10 @@ with st.expander("Configura e avvia il Backtest"):
 
             investimento_totale = numero_scommesse * stake
             roi = (profit_loss / investimento_totale) * 100 if investimento_totale > 0 else 0
+            win_rate = (vincite / numero_scommesse) * 100 if numero_scommesse > 0 else 0
+            odd_minima = 100 / win_rate if win_rate > 0 else 0
             
-            return vincite, perdite, numero_scommesse, profit_loss, roi
+            return vincite, perdite, numero_scommesse, profit_loss, roi, win_rate, odd_minima
 
         # UI per il backtest
         backtest_market = st.selectbox(
@@ -1264,7 +1266,7 @@ with st.expander("Configura e avvia il Backtest"):
         stake = st.number_input("Stake per scommessa", min_value=1.0, value=1.0, step=0.5)
         
         if st.button("Avvia Backtest"):
-            vincite, perdite, numero_scommesse, profit_loss, roi = esegui_backtest(filtered_df, backtest_market, backtest_strategy, stake)
+            vincite, perdite, numero_scommesse, profit_loss, roi, win_rate, odd_minima = esegui_backtest(filtered_df, backtest_market, backtest_strategy, stake)
             
             if numero_scommesse > 0:
                 col_met1, col_met2, col_met3, col_met4 = st.columns(4)
@@ -1272,7 +1274,11 @@ with st.expander("Configura e avvia il Backtest"):
                 col_met2.metric("Vincite", vincite)
                 col_met3.metric("Perdite", perdite)
                 col_met4.metric("Profitto/Perdita", f"{profit_loss:.2f} €")
-                st.metric("ROI", f"{roi:.2f} %")
+                
+                col_met5, col_met6 = st.columns(2)
+                col_met5.metric("ROI", f"{roi:.2f} %")
+                col_met6.metric("Win Rate", f"{win_rate:.2f} %")
+                st.metric("Odd Minima per profitto", f"{odd_minima:.2f}")
             elif numero_scommesse == 0:
                 st.info("Nessuna scommessa idonea trovata con i filtri e il mercato selezionati.")
 
