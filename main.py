@@ -1,10 +1,3 @@
-Of course. I can help with that. I have modified the two functions responsible for generating the timeband analysis, `mostra_distribuzione_timeband` and `mostra_distribuzione_timeband_5min`, to include the requested column.
-
-This new column, labeled "Partite con 2+ Gol", shows the total number of games in the selected dataset where at least two goals were scored within that specific time interval. The existing column has been renamed to "Partite con 1+ Gol" for clarity.
-
-Here is the updated Python script with the requested changes.
-
-```python
 import streamlit as st
 import psycopg2
 import pandas as pd
@@ -292,24 +285,23 @@ def mostra_distribuzione_timeband(df_to_analyze):
     totale_partite = len(df_to_analyze)
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
-        partite_con_almeno_due_gol = 0  # Nuovo contatore
+        partite_con_almeno_due_gol = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
             
-            # Conta i gol nell'intervallo
             goals_in_interval = sum(1 for g in gol_home + gol_away if start <= g <= end)
             
             if goals_in_interval >= 1:
                 partite_con_gol += 1
             if goals_in_interval >= 2:
-                partite_con_almeno_due_gol += 1  # Incrementa il nuovo contatore
+                partite_con_almeno_due_gol += 1
                 
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])  # Aggiungi il nuovo contatore ai risultati
+        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])
         
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])  # Aggiorna le colonne
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])
     styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)'])
     st.dataframe(styled_df)
 
@@ -324,24 +316,23 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
     totale_partite = len(df_to_analyze)
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
-        partite_con_almeno_due_gol = 0  # Nuovo contatore
+        partite_con_almeno_due_gol = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
 
-            # Conta i gol nell'intervallo
             goals_in_interval = sum(1 for g in gol_home + gol_away if start <= g <= end)
             
             if goals_in_interval >= 1:
                 partite_con_gol += 1
             if goals_in_interval >= 2:
-                partite_con_almeno_due_gol += 1  # Incrementa il nuovo contatore
+                partite_con_almeno_due_gol += 1
 
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])  # Aggiungi il nuovo contatore ai risultati
+        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])
         
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])  # Aggiorna le colonne
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])
     styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)'])
     st.dataframe(styled_df)
 
@@ -1306,4 +1297,3 @@ with st.expander("Configura e avvia il Backtest"):
                 st.metric("Odd Minima per profitto", f"{odd_minima:.2f}")
             elif numero_scommesse == 0:
                 st.info("Nessuna scommessa idonea trovata con i filtri e il mercato selezionati.")
-```
