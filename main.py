@@ -27,13 +27,11 @@ except Exception as e:
     st.error(f"Errore durante il caricamento: {e}")
     st.stop()
 
-# --- Aggiunta colonne risultato_ft e risultato_ht ---
 if "gol_home_ft" in df.columns and "gol_away_ft" in df.columns:
     df["risultato_ft"] = df["gol_home_ft"].astype(str) + "-" + df["gol_away_ft"].astype(str)
 
 if "gol_home_ht" in df.columns and "gol_away_ht" in df.columns:
     df["risultato_ht"] = df["gol_home_ht"].astype(str) + "-" + df["gol_away_ht"].astype(str)
-
 filters = {}
 
 # --- Sidebar Filtri ---
@@ -55,7 +53,6 @@ if "giornata" in df.columns:
     giornata_range = st.sidebar.slider("Seleziona Giornata", giornata_min, giornata_max, (giornata_min, giornata_max))
     filters["giornata"] = giornata_range
 
-# ✅ Filtro aggiunto: Risultato all'intervallo (HT)
 if "risultato_ht" in df.columns:
     risultati_ht = ["Tutti"] + sorted(df["risultato_ht"].dropna().unique())
     selected_risultato_ht = st.sidebar.selectbox("Risultato all'intervallo (HT)", risultati_ht)
@@ -91,6 +88,7 @@ def add_range_filter(col_name, label=None):
 st.sidebar.header("Filtri Quote")
 for col in ["odd_home", "odd_draw", "odd_away"]:
     add_range_filter(col)
+
 # --- APPLICA FILTRI ---
 filtered_df = df.copy()
 for col, val in filters.items():
@@ -108,8 +106,6 @@ for col, val in filters.items():
 st.subheader("Dati Filtrati")
 st.dataframe(filtered_df.head(50))
 st.write(f"**Righe visualizzate:** {len(filtered_df)}")
-
-# --- FUNZIONI DI ANALISI ---
 def calcola_winrate(df, col_risultato):
     df_valid = df[df[col_risultato].notna() & df[col_risultato].str.contains("-")]
     risultati = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
@@ -148,69 +144,6 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     st.table(dist)
 
 def analizza_da_minuto(df):
-    # --- TIMEBANDS GLOBALI 5 MIN — DISTRIBUZIONE GOL ---
-st.subheader("Distribuzione Gol Globale — Intervalli da 5 minuti (Partite con almeno 1 gol nel range)")
-
-intervalli_5 = [(i, i+4) for i in range(1, 86, 5)] + [(86, 90), (91, 200)]
-risultati_5_gol = []
-
-for (start, end) in intervalli_5:
-    partite_con_gol = 0
-    for _, row in filtered_df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        # LOGICA: almeno un gol da home o away nel range
-        if any(start <= g <= end for g in gol_home + gol_away):
-            partite_con_gol += 1
-    perc = round(partite_con_gol / len(filtered_df) * 100, 2)
-    odd_min = round(100 / perc, 2) if perc > 0 else "-"
-    risultati_5_gol.append([f"{start}-{end}" if end < 91 else "91+", partite_con_gol, perc, odd_min])
-
-st.table(pd.DataFrame(risultati_5_gol, columns=[
-    "Intervallo minuti",
-    "Partite con almeno 1 gol",
-    "Percentuale %",
-    "Odd Minima"
-]))
-
-# --- TIMEBANDS GLOBALI 5 MIN — OVER GOALS + BTTS ---
-st.subheader("Statistiche Over Goals e BTTS — Intervalli da 5 minuti")
-
-over_btts_5 = []
-
-for (start, end) in intervalli_5:
-    over_counts = {0.5: 0, 1.5: 0, 2.5: 0}
-    btts_si = 0
-    for _, row in filtered_df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        home_range = [g for g in gol_home if start <= g <= end]
-        away_range = [g for g in gol_away if start <= g <= end]
-        tot_goals = len(home_range) + len(away_range)
-
-        for t in over_counts:
-            if tot_goals > t:
-                over_counts[t] += 1
-        if home_range and away_range:
-            btts_si += 1
-
-    for t in over_counts:
-        perc = round(over_counts[t] / len(filtered_df) * 100, 2)
-        odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        over_btts_5.append([f"{start}-{end}" if end < 91 else "91+", f"Over {t}", over_counts[t], perc, odd_min])
-
-    perc_btts = round(btts_si / len(filtered_df) * 100, 2)
-    odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
-    over_btts_5.append([f"{start}-{end}" if end < 91 else "91+", "BTTS SI", btts_si, perc_btts, odd_btts])
-
-st.table(pd.DataFrame(over_btts_5, columns=[
-    "Intervallo minuti",
-    "Mercato",
-    "Conteggio",
-    "Percentuale %",
-    "Odd Minima"
-]))
-
     st.subheader("Analisi dinamica (da minuto A a B)")
     start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
     risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
@@ -264,10 +197,11 @@ st.table(pd.DataFrame(over_btts_5, columns=[
     st.subheader(f"BTTS SI (Range {start_min}-{end_min})")
     st.write(f"BTTS SI: {btts} ({perc_btts}%) - Odd Minima: {odd_btts}")
 
-    st.subheader("Distribuzione Gol per Timeframe (0-90)")
-    intervalli = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90)]
-    risultati = []
-    for (start, end) in intervalli:
+    st.subheader("Distribuzione Gol Globale — Intervalli da 5 minuti (Partite con almeno 1 gol nel range)")
+    intervalli_5min = [(i, i + 4) for i in range(1, 91, 5)]
+    risultati_5min = []
+
+    for (start, end) in intervalli_5min:
         partite_con_gol = 0
         for _, row in df_target.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
@@ -276,61 +210,9 @@ st.table(pd.DataFrame(over_btts_5, columns=[
                 partite_con_gol += 1
         perc = round((partite_con_gol / len(df_target)) * 100, 2)
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        risultati.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
-    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+        risultati_5min.append([f"{start}-{end}", partite_con_gol, perc, odd_min])
+
+    st.table(pd.DataFrame(risultati_5min, columns=["Timeframe 5'", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+# --- ESECUZIONE ANALISI ---
 if not filtered_df.empty and "risultato_ft" in filtered_df.columns:
     analizza_da_minuto(filtered_df)
-st.subheader("Distribuzione Gol Globale — Intervalli da 5 minuti (Partite con almeno 1 gol nel range)")
-
-intervalli_5 = [(i, i+4) for i in range(1, 86, 5)] + [(86, 90), (91, 200)]
-risultati_5 = []
-
-for (start, end) in intervalli_5:
-    partite_con_gol = 0
-    for _, row in filtered_df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        # LOGICA: almeno un gol segnato da una delle due squadre nell'intervallo
-        if any(start <= g <= end for g in gol_home + gol_away):
-            partite_con_gol += 1
-    perc = round((partite_con_gol / len(filtered_df)) * 100, 2)
-    odd_min = round(100 / perc, 2) if perc > 0 else "-"
-    risultati_5.append([f"{start}-{end}" if end < 91 else "91+", partite_con_gol, perc, odd_min])
-
-st.table(pd.DataFrame(risultati_5, columns=[
-    "Intervallo minuti",
-    "Partite con almeno 1 gol",
-    "Percentuale %",
-    "Odd Minima"
-]))
-# --- TIMEBAND GLOBALI SU filtered_df (15 MINUTI) ---
-st.subheader("Distribuzione Gol Globale (intervalli da 15 minuti)")
-intervalli_15 = [(0, 15), (16, 30), (31, 45), (46, 60), (61, 75), (76, 90), (91, 200)]
-risultati_15 = []
-for (start, end) in intervalli_15:
-    partite_con_gol = 0
-    for _, row in filtered_df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        if any(start <= g <= end for g in gol_home + gol_away):
-            partite_con_gol += 1
-    perc = round((partite_con_gol / len(filtered_df)) * 100, 2)
-    odd_min = round(100 / perc, 2) if perc > 0 else "-"
-    risultati_15.append([f"{start}-{end}" if end < 91 else "91+", partite_con_gol, perc, odd_min])
-st.table(pd.DataFrame(risultati_15, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
-
-# --- TIMEBAND GLOBALI SU filtered_df (5 MINUTI) ---
-st.subheader("Distribuzione Gol Globale (intervalli da 5 minuti)")
-intervalli_5 = [(i, i+4) for i in range(1, 86, 5)] + [(86, 90), (91, 200)]
-risultati_5 = []
-for (start, end) in intervalli_5:
-    partite_con_gol = 0
-    for _, row in filtered_df.iterrows():
-        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
-        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-        if any(start <= g <= end for g in gol_home + gol_away):
-            partite_con_gol += 1
-    perc = round((partite_con_gol / len(filtered_df)) * 100, 2)
-    odd_min = round(100 / perc, 2) if perc > 0 else "-"
-    risultati_5.append([f"{start}-{end}" if end < 91 else "91+", partite_con_gol, perc, odd_min])
-st.table(pd.DataFrame(risultati_5, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
