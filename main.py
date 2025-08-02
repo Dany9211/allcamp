@@ -148,6 +148,69 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     st.table(dist)
 
 def analizza_da_minuto(df):
+    # --- TIMEBANDS GLOBALI 5 MIN — DISTRIBUZIONE GOL ---
+st.subheader("Distribuzione Gol Globale — Intervalli da 5 minuti (Partite con almeno 1 gol nel range)")
+
+intervalli_5 = [(i, i+4) for i in range(1, 86, 5)] + [(86, 90), (91, 200)]
+risultati_5_gol = []
+
+for (start, end) in intervalli_5:
+    partite_con_gol = 0
+    for _, row in filtered_df.iterrows():
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        # LOGICA: almeno un gol da home o away nel range
+        if any(start <= g <= end for g in gol_home + gol_away):
+            partite_con_gol += 1
+    perc = round(partite_con_gol / len(filtered_df) * 100, 2)
+    odd_min = round(100 / perc, 2) if perc > 0 else "-"
+    risultati_5_gol.append([f"{start}-{end}" if end < 91 else "91+", partite_con_gol, perc, odd_min])
+
+st.table(pd.DataFrame(risultati_5_gol, columns=[
+    "Intervallo minuti",
+    "Partite con almeno 1 gol",
+    "Percentuale %",
+    "Odd Minima"
+]))
+
+# --- TIMEBANDS GLOBALI 5 MIN — OVER GOALS + BTTS ---
+st.subheader("Statistiche Over Goals e BTTS — Intervalli da 5 minuti")
+
+over_btts_5 = []
+
+for (start, end) in intervalli_5:
+    over_counts = {0.5: 0, 1.5: 0, 2.5: 0}
+    btts_si = 0
+    for _, row in filtered_df.iterrows():
+        gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
+        gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
+        home_range = [g for g in gol_home if start <= g <= end]
+        away_range = [g for g in gol_away if start <= g <= end]
+        tot_goals = len(home_range) + len(away_range)
+
+        for t in over_counts:
+            if tot_goals > t:
+                over_counts[t] += 1
+        if home_range and away_range:
+            btts_si += 1
+
+    for t in over_counts:
+        perc = round(over_counts[t] / len(filtered_df) * 100, 2)
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        over_btts_5.append([f"{start}-{end}" if end < 91 else "91+", f"Over {t}", over_counts[t], perc, odd_min])
+
+    perc_btts = round(btts_si / len(filtered_df) * 100, 2)
+    odd_btts = round(100 / perc_btts, 2) if perc_btts > 0 else "-"
+    over_btts_5.append([f"{start}-{end}" if end < 91 else "91+", "BTTS SI", btts_si, perc_btts, odd_btts])
+
+st.table(pd.DataFrame(over_btts_5, columns=[
+    "Intervallo minuti",
+    "Mercato",
+    "Conteggio",
+    "Percentuale %",
+    "Odd Minima"
+]))
+
     st.subheader("Analisi dinamica (da minuto A a B)")
     start_min, end_min = st.slider("Seleziona intervallo minuti", 1, 90, (20, 45))
     risultati_correnti = st.multiselect("Risultato corrente al minuto iniziale",
