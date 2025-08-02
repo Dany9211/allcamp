@@ -237,7 +237,8 @@ def mostra_risultati_esatti(df, col_risultato, titolo):
     distribuzione["Odd Minima"] = distribuzione["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
 
     st.subheader(f"Risultati Esatti {titolo} ({len(df_valid)} partite)")
-    st.table(distribuzione)
+    styled_df = distribuzione.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
 
 # --- FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND (15 MIN) ---
 def mostra_distribuzione_timeband(df_to_analyze):
@@ -258,7 +259,9 @@ def mostra_distribuzione_timeband(df_to_analyze):
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([label, partite_con_gol, perc, odd_min])
-    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"])
+    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
 
 # --- NUOVA FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND (5 MIN) ---
 def mostra_distribuzione_timeband_5min(df_to_analyze):
@@ -279,7 +282,9 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
         risultati.append([label, partite_con_gol, perc, odd_min])
-    st.table(pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"]))
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"])
+    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
 
 # --- FUNZIONE NEXT GOAL ---
 def calcola_next_goal(df_to_analyze, start_min, end_min):
@@ -524,10 +529,12 @@ if not filtered_df.empty:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("WinRate HT")
-        st.table(calcola_winrate(filtered_df, "risultato_ht"))
+        styled_df_ht = calcola_winrate(filtered_df, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        st.dataframe(styled_df_ht)
     with col2:
         st.subheader("WinRate FT")
-        st.table(calcola_winrate(filtered_df, "risultato_ft"))
+        styled_df_ft = calcola_winrate(filtered_df, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        st.dataframe(styled_df_ft)
 
     # Over Goals HT e FT
     col1, col2 = st.columns(2)
@@ -543,7 +550,9 @@ if not filtered_df.empty:
             perc = round((count / len(df_prematch_ht)) * 100, 2)
             odd_min = round(100 / perc, 2) if perc > 0 else "-"
             over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
-        st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+        df_over_ht = pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+        styled_over_ht = df_over_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_over_ht)
 
     with col2:
         st.subheader("Over Goals FT")
@@ -553,7 +562,9 @@ if not filtered_df.empty:
             perc = round((count / len(df_prematch_ht)) * 100, 2)
             odd_min = round(100 / perc, 2) if perc > 0 else "-"
             over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
-        st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+        df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+        styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_over_ft)
         
     # BTTS
     btts_ht = ((df_prematch_ht["gol_home_ht"] > 0) & (df_prematch_ht["gol_away_ht"] > 0)).sum()
@@ -570,25 +581,30 @@ if not filtered_df.empty:
 
     # First to Score
     st.subheader("First to Score (Pre-Match)")
-    st.table(calcola_first_to_score(filtered_df))
+    styled_df = calcola_first_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
     
     # To Score
     st.subheader("To Score (Pre-Match)")
-    st.table(calcola_to_score(filtered_df))
+    styled_df = calcola_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
     
     # Clean Sheet
     st.subheader("Clean Sheet (Pre-Match)")
-    st.table(calcola_clean_sheet(filtered_df))
+    styled_df = calcola_clean_sheet(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
     
     # Combo Markets
     st.subheader("Combo Markets (Pre-Match)")
-    st.table(calcola_combo_stats(filtered_df))
+    styled_df = calcola_combo_stats(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
     
     # Analisi Rimonte
     st.subheader("Analisi Rimonte (Pre-Match)")
     rimonte_stats, squadre_rimonte = calcola_rimonte(filtered_df, "Pre-Match")
     if not rimonte_stats.empty:
-        st.table(rimonte_stats)
+        styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
         
         st.markdown("**Squadre che hanno effettuato rimonte:**")
         for tipo, squadre in squadre_rimonte.items():
@@ -652,9 +668,11 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             # WinRate
             st.subheader(f"WinRate (Dinamica)")
             st.write("**HT:**")
-            st.table(calcola_winrate(df_target, "risultato_ht"))
+            styled_df_ht = calcola_winrate(df_target, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+            st.dataframe(styled_df_ht)
             st.write("**FT:**")
-            st.table(calcola_winrate(df_target, "risultato_ft"))
+            styled_df_ft = calcola_winrate(df_target, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+            st.dataframe(styled_df_ft)
 
             # --- NUOVO CALCOLO OVER GOALS DINAMICO HT ---
             st.subheader("Over Goals HT (Dinamica)")
@@ -665,7 +683,9 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
                 perc = round((count / len(df_target_goals)) * 100, 2)
                 odd_min = round(100 / perc, 2) if perc > 0 else "-"
                 over_ht_data_dynamic.append([f"Over {t} HT", count, perc, odd_min])
-            st.table(pd.DataFrame(over_ht_data_dynamic, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+            df_over_ht_dynamic = pd.DataFrame(over_ht_data_dynamic, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+            styled_over_ht_dynamic = df_over_ht_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_over_ht_dynamic)
 
             # Over Goals FT
             st.subheader("Over Goals FT (Dinamica)")
@@ -676,7 +696,9 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
                 perc = round((count / len(df_target_goals)) * 100, 2)
                 odd_min = round(100 / perc, 2) if perc > 0 else "-"
                 over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
-            st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+            df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+            styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_over_ft)
             
             # BTTS
             btts_ht = ((df_target_goals["gol_home_ht"] > 0) & (df_target_goals["gol_away_ht"] > 0)).sum()
@@ -693,29 +715,35 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
 
             # First to Score nell'analisi dinamica
             st.subheader("First to Score (Dinamica)")
-            st.table(calcola_first_to_score(df_target))
+            styled_df = calcola_first_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # To Score nell'analisi dinamica
             st.subheader("To Score (Dinamica)")
-            st.table(calcola_to_score(df_target))
+            styled_df = calcola_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Clean Sheet nell'analisi dinamica
             st.subheader("Clean Sheet (Dinamica)")
-            st.table(calcola_clean_sheet(df_target))
+            styled_df = calcola_clean_sheet(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Combo Markets nell'analisi dinamica
             st.subheader("Combo Markets (Dinamica)")
-            st.table(calcola_combo_stats(df_target))
+            styled_df = calcola_combo_stats(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Next Goal nell'analisi dinamica
             st.subheader("Next Goal (Dinamica)")
-            st.table(calcola_next_goal(df_target, start_min, end_min))
+            styled_df = calcola_next_goal(df_target, start_min, end_min).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Analisi Rimonte Dinamica
             st.subheader("Analisi Rimonte (Dinamica)")
             rimonte_stats, squadre_rimonte = calcola_rimonte(df_target, "Dinamica")
             if not rimonte_stats.empty:
-                st.table(rimonte_stats)
+                styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
                 st.markdown("**Squadre che hanno effettuato rimonte:**")
                 for tipo, squadre in squadre_rimonte.items():
                     if squadre:
@@ -784,10 +812,12 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("WinRate HT H2H")
-                st.table(calcola_winrate(h2h_df, "risultato_ht"))
+                styled_df_ht = calcola_winrate(h2h_df, "risultato_ht").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+                st.dataframe(styled_df_ht)
             with col2:
                 st.subheader("WinRate FT H2H")
-                st.table(calcola_winrate(h2h_df, "risultato_ft"))
+                styled_df_ft = calcola_winrate(h2h_df, "risultato_ft").style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+                st.dataframe(styled_df_ft)
 
             # Over Goals H2H
             col1, col2 = st.columns(2)
@@ -802,7 +832,9 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                     perc = round((count / len(df_h2h_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
                     over_ht_data.append([f"Over {t} HT", count, perc, odd_min])
-                st.table(pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+                df_over_ht = pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+                styled_over_ht = df_over_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_over_ht)
 
             with col2:
                 st.subheader("Over Goals FT H2H")
@@ -812,7 +844,9 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                     perc = round((count / len(df_h2h_goals)) * 100, 2)
                     odd_min = round(100 / perc, 2) if perc > 0 else "-"
                     over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
-                st.table(pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"]))
+                df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+                styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_over_ft)
 
             # BTTS H2H
             btts_ht = ((df_h2h_goals["gol_home_ht"] > 0) & (df_h2h_goals["gol_away_ht"] > 0)).sum()
@@ -829,25 +863,30 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
 
             # First to Score H2H
             st.subheader("First to Score (H2H)")
-            st.table(calcola_first_to_score(h2h_df))
+            styled_df = calcola_first_to_score(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # To Score H2H
             st.subheader("To Score (H2H)")
-            st.table(calcola_to_score(h2h_df))
+            styled_df = calcola_to_score(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Clean Sheet H2H
             st.subheader("Clean Sheet (H2H)")
-            st.table(calcola_clean_sheet(h2h_df))
+            styled_df = calcola_clean_sheet(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Combo Markets H2H
             st.subheader("Combo Markets (H2H)")
-            st.table(calcola_combo_stats(h2h_df))
+            styled_df = calcola_combo_stats(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # Analisi Rimonte H2H
             st.subheader("Analisi Rimonte (H2H)")
             rimonte_stats, squadre_rimonte = calcola_rimonte(h2h_df, "H2H")
             if not rimonte_stats.empty:
-                st.table(rimonte_stats)
+                styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
                 
                 st.markdown("**Squadre che hanno effettuato rimonte:**")
                 for tipo, squadre in squadre_rimonte.items():
