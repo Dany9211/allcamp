@@ -1006,6 +1006,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             if not rimonte_stats.empty:
                 styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
+                
                 st.markdown("**Squadre che hanno effettuato rimonte:**")
                 for tipo, squadre in squadre_rimonte.items():
                     if squadre:
@@ -1185,7 +1186,7 @@ with st.expander("Configura e avvia il Backtest"):
         st.warning("Il DataFrame filtrato è vuoto, non è possibile eseguire il backtest.")
     else:
         # Funzione per eseguire il backtest
-        def esegui_backtest(df_to_analyze, market, stake):
+        def esegui_backtest(df_to_analyze, market, strategy, stake):
             vincite = 0
             perdite = 0
             profit_loss = 0.0
@@ -1230,12 +1231,21 @@ with st.expander("Configura e avvia il Backtest"):
                             is_winning = True
 
                     if odd > 0:
-                        if is_winning:
-                            vincite += 1
-                            profit_loss += (odd - 1) * stake
-                        else:
-                            perdite += 1
-                            profit_loss -= stake
+                        if strategy == "Back":
+                            if is_winning:
+                                vincite += 1
+                                profit_loss += (odd - 1) * stake
+                            else:
+                                perdite += 1
+                                profit_loss -= stake
+                        elif strategy == "Lay":
+                            if is_winning:
+                                perdite += 1
+                                profit_loss -= (odd - 1) * stake
+                            else:
+                                vincite += 1
+                                profit_loss += stake
+                        
                         numero_scommesse += 1
                 
                 except (ValueError, KeyError):
@@ -1252,10 +1262,14 @@ with st.expander("Configura e avvia il Backtest"):
             "Seleziona un mercato da testare",
             ["1 (Casa)", "X (Pareggio)", "2 (Trasferta)", "Over 2.5 FT", "BTTS SI FT"]
         )
+        backtest_strategy = st.selectbox(
+            "Seleziona la strategia",
+            ["Back", "Lay"]
+        )
         stake = st.number_input("Stake per scommessa", min_value=1.0, value=1.0, step=0.5)
         
         if st.button("Avvia Backtest"):
-            vincite, perdite, numero_scommesse, profit_loss, roi = esegui_backtest(filtered_df, backtest_market, stake)
+            vincite, perdite, numero_scommesse, profit_loss, roi = esegui_backtest(filtered_df, backtest_market, backtest_strategy, stake)
             
             col_met1, col_met2, col_met3, col_met4 = st.columns(4)
             col_met1.metric("Numero Scommesse", numero_scommesse)
@@ -1267,4 +1281,3 @@ with st.expander("Configura e avvia il Backtest"):
                 st.metric("ROI", f"{roi:.2f} %")
             else:
                 st.metric("ROI", "0.00 %")
-
