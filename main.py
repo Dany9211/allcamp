@@ -22,7 +22,17 @@ def run_query(query: str):
     """
     try:
         # Usa l'URI di connessione salvato nei secrets di Streamlit.
+        # Ho aggiunto un controllo per dare un errore più chiaro in caso di mancata configurazione.
+        if "supabase" not in st.secrets or "uri" not in st.secrets["supabase"]:
+            st.error("Errore: Le credenziali del database non sono state trovate in `secrets.toml`.\nAssicurati di aver configurato il file come indicato.")
+            st.stop()
+            return pd.DataFrame()
+        
         db_uri = st.secrets["supabase"]["uri"]
+        
+        # Stampa l'URI (senza credenziali sensibili) nella console per debug
+        print(f"Tentativo di connessione al database con URI: {db_uri.split('//')[0]}//[...]:[...][email]@[...]")
+
         # Crea l'engine di SQLAlchemy.
         engine = create_engine(db_uri)
 
@@ -32,7 +42,9 @@ def run_query(query: str):
         # Non è necessario chiudere la connessione, l'engine la gestisce.
         return df
     except Exception as e:
-        st.error(f"Errore di connessione al database: {e}")
+        # Stampa l'errore completo nella console per una migliore risoluzione dei problemi
+        print(f"Errore dettagliato di connessione: {e}")
+        st.error(f"Errore di connessione al database. Controlla la console per i dettagli: {e}")
         st.stop()
         return pd.DataFrame()
 
