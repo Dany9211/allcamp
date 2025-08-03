@@ -285,24 +285,16 @@ def mostra_distribuzione_timeband(df_to_analyze):
     totale_partite = len(df_to_analyze)
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
-        partite_con_almeno_due_gol = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-            
-            goals_in_interval = sum(1 for g in gol_home + gol_away if start <= g <= end)
-            
-            if goals_in_interval >= 1:
+            if any(start <= g <= end for g in gol_home + gol_away):
                 partite_con_gol += 1
-            if goals_in_interval >= 2:
-                partite_con_almeno_due_gol += 1
-                
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])
-        
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])
-    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)'])
+        risultati.append([label, partite_con_gol, perc, odd_min])
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"])
+    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
     st.dataframe(styled_df)
 
 # --- NUOVA FUNZIONE RIUTILIZZABILE PER DISTRIBUZIONE TIMEBAND (5 MIN) ---
@@ -316,24 +308,16 @@ def mostra_distribuzione_timeband_5min(df_to_analyze):
     totale_partite = len(df_to_analyze)
     for (start, end), label in zip(intervalli, label_intervalli):
         partite_con_gol = 0
-        partite_con_almeno_due_gol = 0
         for _, row in df_to_analyze.iterrows():
             gol_home = [int(x) for x in str(row.get("minutaggio_gol", "")).split(";") if x.isdigit()]
             gol_away = [int(x) for x in str(row.get("minutaggio_gol_away", "")).split(";") if x.isdigit()]
-
-            goals_in_interval = sum(1 for g in gol_home + gol_away if start <= g <= end)
-            
-            if goals_in_interval >= 1:
+            if any(start <= g <= end for g in gol_home + gol_away):
                 partite_con_gol += 1
-            if goals_in_interval >= 2:
-                partite_con_almeno_due_gol += 1
-
         perc = round((partite_con_gol / totale_partite) * 100, 2) if totale_partite > 0 else 0
         odd_min = round(100 / perc, 2) if perc > 0 else "-"
-        risultati.append([label, partite_con_gol, partite_con_almeno_due_gol, perc, odd_min])
-        
-    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con 1+ Gol", "Partite con 2+ Gol", "Percentuale % (1+ Gol)", "Odd Minima (1+ Gol)"])
-    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale % (1+ Gol)'])
+        risultati.append([label, partite_con_gol, perc, odd_min])
+    df_result = pd.DataFrame(risultati, columns=["Timeframe", "Partite con Gol", "Percentuale %", "Odd Minima"])
+    styled_df = df_result.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
     st.dataframe(styled_df)
 
 # --- FUNZIONE NEXT GOAL ---
@@ -1297,3 +1281,4 @@ with st.expander("Configura e avvia il Backtest"):
                 st.metric("Odd Minima per profitto", f"{odd_minima:.2f}")
             elif numero_scommesse == 0:
                 st.info("Nessuna scommessa idonea trovata con i filtri e il mercato selezionati.")
+
