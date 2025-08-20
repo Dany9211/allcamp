@@ -1277,17 +1277,17 @@ if not filtered_df.empty:
         st.subheader(f"Goals Fatti e Subiti HT ({len(filtered_df)})")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("### Fatti Casa")
+            st.markdown("#### Fatti Casa")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         with col2:
-            st.markdown("### Subiti Casa")
+            st.markdown("#### Subiti Casa")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         col3, col4 = st.columns(2)
         with col3:
-            st.markdown("### Fatti Trasferta")
+            st.markdown("#### Fatti Trasferta")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         with col4:
-            st.markdown("### Subiti Trasferta")
+            st.markdown("#### Subiti Trasferta")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
     
     # --- Nuove Expander per Statistiche SH ---
@@ -1369,17 +1369,17 @@ if not filtered_df.empty:
         st.subheader(f"Goals Fatti e Subiti SH ({len(filtered_df)})")
         col1, col2 = st.columns(2)
         with col1:
-            st.markdown("### Fatti Casa")
+            st.markdown("#### Fatti Casa")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         with col2:
-            st.markdown("### Subiti Casa")
+            st.markdown("#### Subiti Casa")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         col3, col4 = st.columns(2)
         with col3:
-            st.markdown("### Fatti Trasferta")
+            st.markdown("#### Fatti Trasferta")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
         with col4:
-            st.markdown("### Subiti Trasferta")
+            st.markdown("#### Subiti Trasferta")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
     
     # --- Expander per Statistiche FT ---
@@ -1448,27 +1448,22 @@ if not filtered_df.empty:
                     st.markdown(f"**{tipo}:** {', '.join(squadre)}")
         else:
             st.warning("Nessuna rimonta trovata nel dataset filtrato.")
-    
-    st.subheader("Goals Fatti e Subiti (Pre-Match)")
-    with st.expander("Mostra Goals Fatti e Subiti Casa"):
-        st.markdown("### Goals Fatti Casa")
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.markdown("### Goals Subiti Casa")
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-    
-    with st.expander("Mostra Goals Fatti e Subiti Trasferta"):
-        st.markdown("### Goals Fatti Trasferta")
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.markdown("### Goals Subiti Trasferta")
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-        st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        
+        st.subheader(f"Goals Fatti e Subiti FT ({len(filtered_df)})")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("#### Fatti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col2:
+            st.markdown("#### Subiti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("#### Fatti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col4:
+            st.markdown("#### Subiti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'ft').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
 
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
