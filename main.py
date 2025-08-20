@@ -727,7 +727,7 @@ def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
 
     data = [
         ["BTTS SI (Dinamica)", btts_si_count, round((btts_si_count / total_matches) * 100, 2) if total_matches > 0 else 0],
-        ["BTTS NO (Dinamica)", btts_no_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+        ["BTTS NO (Dinamica)", btts_no_count, round((btts_no_count / total_matches) * 100, 2) if total_matches > 0 else 0]
     ]
 
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
@@ -1001,7 +1001,7 @@ if not filtered_df.empty:
     styled_df = calcola_first_to_score_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
     st.dataframe(styled_df)
 
-    # Nuova sezione: First to Score + Next Goal
+    # First to Score + Next Goal
     st.subheader(f"First to Score + Risultato Prossimo Gol (Pre-Match) ({len(filtered_df)})")
     styled_df = calcola_first_to_score_next_goal_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
     st.dataframe(styled_df)
@@ -1189,7 +1189,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             styled_df = calcola_first_to_score_outcome(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
             
-            # Nuova sezione: First to Score + Next Goal Dinamica
+            # First to Score + Next Goal Dinamica
             st.subheader(f"First to Score + Risultato Prossimo Gol (Dinamica) ({len(df_target)})")
             styled_df = calcola_first_to_score_next_goal_outcome(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
@@ -1384,7 +1384,7 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             styled_df = calcola_first_to_score_outcome(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
 
-            # Nuova sezione: First to Score + Next Goal H2H
+            # First to Score + Next Goal H2H
             st.subheader(f"First to Score + Risultato Prossimo Gol (H2H) ({len(h2h_df)})")
             styled_df = calcola_first_to_score_next_goal_outcome(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
