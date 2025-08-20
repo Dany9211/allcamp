@@ -596,7 +596,7 @@ def calcola_goals_per_team_period(df_to_analyze, team_type, action_type, period)
     df_temp[col_to_analyze] = pd.to_numeric(df_temp[col_to_analyze], errors='coerce')
     total_matches = len(df_temp)
     
-    ranges = [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]
+    ranges = [0.5, 1.5]
     data = []
     
     for r in ranges:
@@ -1274,15 +1274,30 @@ if not filtered_df.empty:
         st.subheader(f"To Score HT ({len(filtered_df)})")
         styled_df = calcola_to_score_ht(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
+        st.subheader(f"Goals Fatti e Subiti HT ({len(filtered_df)})")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("### Fatti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col2:
+            st.markdown("### Subiti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("### Fatti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col4:
+            st.markdown("### Subiti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'ht').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
     
     # --- Nuove Expander per Statistiche SH ---
     with st.expander("Mostra Statistiche SH (Secondo Tempo)"):
         st.write(f"Analisi basata su **{len(filtered_df)}** partite.")
-        st.subheader(f"WinRate SH ({len(filtered_df)})")
         df_sh = filtered_df.copy()
         df_sh["gol_home_sh"] = pd.to_numeric(df_sh["gol_home_ft"], errors='coerce') - pd.to_numeric(df_sh["gol_home_ht"], errors='coerce')
         df_sh["gol_away_sh"] = pd.to_numeric(df_sh["gol_away_ft"], errors='coerce') - pd.to_numeric(df_sh["gol_away_ht"], errors='coerce')
         
+        st.subheader(f"WinRate SH ({len(filtered_df)})")
         risultati_sh = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
         for _, row in df_sh.iterrows():
             if row["gol_home_sh"] > row["gol_away_sh"]:
@@ -1350,6 +1365,22 @@ if not filtered_df.empty:
         st.subheader(f"Clean Sheet SH ({len(filtered_df)})")
         styled_df = calcola_clean_sheet_sh(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
+
+        st.subheader(f"Goals Fatti e Subiti SH ({len(filtered_df)})")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("### Fatti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col2:
+            st.markdown("### Subiti Casa")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'home', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        col3, col4 = st.columns(2)
+        with col3:
+            st.markdown("### Fatti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'fatti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
+        with col4:
+            st.markdown("### Subiti Trasferta")
+            st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
     
     # --- Expander per Statistiche FT ---
     with st.expander("Mostra Statistiche FT (Finale)"):
@@ -1417,8 +1448,7 @@ if not filtered_df.empty:
                     st.markdown(f"**{tipo}:** {', '.join(squadre)}")
         else:
             st.warning("Nessuna rimonta trovata nel dataset filtrato.")
-
-    # --- Nuove sezioni per Goals fatti e subiti ---
+    
     st.subheader("Goals Fatti e Subiti (Pre-Match)")
     with st.expander("Mostra Goals Fatti e Subiti Casa"):
         st.markdown("### Goals Fatti Casa")
