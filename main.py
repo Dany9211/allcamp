@@ -1183,7 +1183,7 @@ def calcola_multi_gol(df_to_analyze, col_gol, titolo):
     df_stats = pd.DataFrame(data, columns=[f"Mercato ({titolo})", "Conteggio", "Percentuale %", "Odd Minima"])
     return df_stats
 
-# --- SEZIONE 1: Analisi Timeband per Campionato ---
+# SEZIONE 1: Analisi Timeband per Campionato
 st.subheader("1. Analisi Timeband per Campionato")
 if selected_league != "Tutte":
     df_league_only = df[df["league"] == selected_league]
@@ -1199,7 +1199,7 @@ if selected_league != "Tutte":
 else:
     st.write("Seleziona un campionato per visualizzare questa analisi.")
 
-# --- SEZIONE 2: Analisi Timeband per Campionato e Quote ---
+# SEZIONE 2: Analisi Timeband per Campionato e Quote
 st.subheader("2. Analisi Timeband per Campionato e Quote")
 st.write(f"Analisi basata su **{len(filtered_df)}** partite filtrate da tutti i parametri della sidebar.")
 if not filtered_df.empty:
@@ -1215,7 +1215,7 @@ else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati.")
 
 
-# --- NUOVA SEZIONE: Statistiche Pre-Match Complete (Filtri Sidebar) ---
+# NUOVA SEZIONE: Statistiche Pre-Match Complete (Filtri Sidebar)
 st.subheader("3. Analisi Pre-Match Completa (Filtri Sidebar)")
 st.write(f"Analisi completa basata su **{len(filtered_df)}** partite, considerando tutti i filtri del menu a sinistra.")
 if not filtered_df.empty:
@@ -1365,7 +1365,7 @@ if not filtered_df.empty:
         st.subheader(f"Clean Sheet SH ({len(filtered_df)})")
         styled_df = calcola_clean_sheet_sh(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-
+        
         st.subheader(f"Goals Fatti e Subiti SH ({len(filtered_df)})")
         col1, col2 = st.columns(2)
         with col1:
@@ -1381,7 +1381,7 @@ if not filtered_df.empty:
         with col4:
             st.markdown("#### Subiti Trasferta")
             st.dataframe(calcola_goals_per_team_period(filtered_df, 'away', 'subiti', 'sh').style.background_gradient(cmap='RdYlGn', subset=['Percentuale %']))
-    
+
     # --- Expander per Statistiche FT ---
     with st.expander("Mostra Statistiche FT (Finale)"):
         mostra_risultati_esatti(filtered_df, "risultato_ft", f"FT ({len(filtered_df)})")
@@ -1468,7 +1468,7 @@ if not filtered_df.empty:
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
 
-# --- SEZIONE 4: Analisi Timeband Dinamica (Minuto/Risultato) ---
+# SEZIONE 4: Analisi Timeband Dinamica (Minuto/Risultato)
 st.subheader("4. Analisi Timeband Dinamica")
 with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
     if not filtered_df.empty:
