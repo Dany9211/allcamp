@@ -162,6 +162,102 @@ st.markdown("---")
 st.dataframe(filtered_df.head(50))
 
 
+# --- Funzione per calcolare le probabilità di Vittoria/Sconfitta dopo il primo gol ---
+def calcola_first_to_score_outcome(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+    
+    # Assicurati che le colonne siano numeriche
+    df_to_analyze["gol_home_ft"] = pd.to_numeric(df_to_analyze["gol_home_ft"], errors='coerce')
+    df_to_analyze["gol_away_ft"] = pd.to_numeric(df_to_analyze["gol_away_ft"], errors='coerce')
+
+    risultati = {
+        "Casa Segna Primo e Vince": 0,
+        "Casa Segna Primo e Non Vince": 0,
+        "Trasferta Segna Prima e Vince": 0,
+        "Trasferta Segna Prima e Non Vince": 0,
+        "Nessun Gol": 0
+    }
+    
+    totale_partite = len(df_to_analyze)
+
+    for _, row in df_to_analyze.iterrows():
+        gol_home_str = str(row.get("minutaggio_gol", ""))
+        gol_away_str = str(row.get("minutaggio_gol_away", ""))
+
+        gol_home = [int(x) for x in gol_home_str.split(";") if x.isdigit()]
+        gol_away = [int(x) for x in gol_away_str.split(";") if x.isdigit()]
+
+        min_home_goal = min(gol_home) if gol_home else float('inf')
+        min_away_goal = min(gol_away) if gol_away else float('inf')
+        
+        home_vince = row["gol_home_ft"] > row["gol_away_ft"]
+        away_vince = row["gol_away_ft"] > row["gol_home_ft"]
+        
+        if min_home_goal < min_away_goal:
+            # Home segna per primo
+            if home_vince:
+                risultati["Casa Segna Primo e Vince"] += 1
+            else:
+                risultati["Casa Segna Primo e Non Vince"] += 1
+        elif min_away_goal < min_home_goal:
+            # Away segna per primo
+            if away_vince:
+                risultati["Trasferta Segna Prima e Vince"] += 1
+            else:
+                risultati["Trasferta Segna Prima e Non Vince"] += 1
+        else:
+            # Nessun gol
+            risultati["Nessun Gol"] += 1
+
+    stats = []
+    for esito, count in risultati.items():
+        perc = round((count / totale_partite) * 100, 2) if totale_partite > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats.append((esito, count, perc, odd_min))
+    
+    return pd.DataFrame(stats, columns=["Esito", "Conteggio", "Percentuale %", "Odd Minima"])
+
+# --- Funzione per calcolare i mercati di Doppia Chance ---
+def calcola_double_chance(df_to_analyze, period):
+    if df_to_analyze.empty:
+        return pd.DataFrame(columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+    
+    df_double_chance = df_to_analyze.copy()
+    
+    if period == 'ft':
+        df_double_chance["gol_home"] = pd.to_numeric(df_double_chance["gol_home_ft"], errors='coerce')
+        df_double_chance["gol_away"] = pd.to_numeric(df_double_chance["gol_away_ft"], errors='coerce')
+    elif period == 'ht':
+        df_double_chance["gol_home"] = pd.to_numeric(df_double_chance["gol_home_ht"], errors='coerce')
+        df_double_chance["gol_away"] = pd.to_numeric(df_double_chance["gol_away_ht"], errors='coerce')
+    else:
+        st.error("Periodo non valido per il calcolo della doppia chance.")
+        return pd.DataFrame()
+        
+    total_matches = len(df_double_chance)
+    
+    # 1X (Home Win or Draw)
+    count_1x = ((df_double_chance["gol_home"] >= df_double_chance["gol_away"])).sum()
+    
+    # 12 (Home Win or Away Win)
+    count_12 = ((df_double_chance["gol_home"] != df_double_chance["gol_away"])).sum()
+    
+    # X2 (Draw or Away Win)
+    count_x2 = ((df_double_chance["gol_away"] >= df_double_chance["gol_home"])).sum()
+    
+    data = [
+        ["1X", count_1x, round((count_1x / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["12", count_12, round((count_12 / total_matches) * 100, 2) if total_matches > 0 else 0],
+        ["X2", count_x2, round((count_x2 / total_matches) * 100, 2) if total_matches > 0 else 0]
+    ]
+    
+    df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_stats["Odd Minima"] = df_stats["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_stats
+
+
 # --- FUNZIONE WINRATE ---
 def calcola_winrate(df, col_risultato):
     df_valid = df[df[col_risultato].notna() & (df[col_risultato].str.contains("-"))]
@@ -571,7 +667,7 @@ def calcola_btts_dinamico(df_to_analyze, start_min, risultati_correnti):
 
     data = [
         ["BTTS SI (Dinamica)", btts_si_count, round((btts_si_count / total_matches) * 100, 2) if total_matches > 0 else 0],
-        ["BTTS NO (Dinamica)", btts_no_count, round((btts_no_count / total_matches) * 100, 2) if total_matches > 0 else 0]
+        ["BTTS NO (Dinamica)", btts_no_count, round((no_btts_count / total_matches) * 100, 2) if total_matches > 0 else 0]
     ]
 
     df_stats = pd.DataFrame(data, columns=["Mercato", "Conteggio", "Percentuale %"])
@@ -808,6 +904,20 @@ if not filtered_df.empty:
         df_btts_ft = calcola_btts_ft(filtered_df)
         styled_df = df_btts_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
+    
+    # Nuova sezione: Doppia Chance Pre-Match
+    st.subheader(f"Doppia Chance (Pre-Match) ({len(filtered_df)})")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("### HT")
+        df_dc_ht = calcola_double_chance(filtered_df, 'ht')
+        styled_df = df_dc_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+    with col2:
+        st.write("### FT")
+        df_dc_ft = calcola_double_chance(filtered_df, 'ft')
+        styled_df = df_dc_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
 
     # Multi Gol
     st.subheader(f"Multi Gol (Pre-Match) ({len(filtered_df)})")
@@ -824,6 +934,11 @@ if not filtered_df.empty:
     # First to Score
     st.subheader(f"First to Score (Pre-Match) ({len(filtered_df)})")
     styled_df = calcola_first_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+    st.dataframe(styled_df)
+    
+    # Nuova sezione: First to Score + Outcome
+    st.subheader(f"First to Score + Risultato Finale (Pre-Match) ({len(filtered_df)})")
+    styled_df = calcola_first_to_score_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
     st.dataframe(styled_df)
     
     # To Score
@@ -923,7 +1038,7 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
             df_winrate_ft_dynamic = calcola_winrate(df_target, "risultato_ft")
             styled_df_ft = df_winrate_ft_dynamic.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
             st.dataframe(styled_df_ft)
-
+            
             # Over Goals HT e FT
             col1, col2 = st.columns(2)
             df_target_goals["tot_goals_ht"] = df_target_goals["gol_home_ht"] + df_target_goals["gol_away_ht"]
@@ -967,6 +1082,20 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
                 styled_df = df_btts_ft_dynamic.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
 
+            # Nuova sezione: Doppia Chance Dinamica
+            st.subheader(f"Doppia Chance (Dinamica) ({len(df_target)})")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### HT")
+                df_dc_ht = calcola_double_chance(df_target, 'ht')
+                styled_df = df_dc_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.write("### FT")
+                df_dc_ft = calcola_double_chance(df_target, 'ft')
+                styled_df = df_dc_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+
             # Multi Gol
             st.subheader(f"Multi Gol (Dinamica) ({len(df_target)})")
             col1, col2 = st.columns(2)
@@ -989,6 +1118,11 @@ with st.expander("Mostra Analisi Dinamica (Minuto/Risultato)"):
                 st.subheader(f"First to Score FT (Dinamica) ({len(df_target)})")
                 styled_df = calcola_first_to_score(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
+            
+            # Nuova sezione: First to Score + Outcome Dinamica
+            st.subheader(f"First to Score + Risultato Finale (Dinamica) ({len(df_target)})")
+            styled_df = calcola_first_to_score_outcome(df_target).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
             
             # To Score nell'analisi dinamica (HT e FT)
             col1, col2 = st.columns(2)
@@ -1100,6 +1234,20 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                 df_winrate_ft_h2h = calcola_winrate(h2h_df, "risultato_ft")
                 styled_df_ft = df_winrate_ft_h2h.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
                 st.dataframe(styled_df_ft)
+            
+            # Nuova sezione: Doppia Chance H2H
+            st.subheader(f"Doppia Chance (H2H) ({len(h2h_df)})")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("### HT")
+                df_dc_ht_h2h = calcola_double_chance(h2h_df, 'ht')
+                styled_df = df_dc_ht_h2h.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
+            with col2:
+                st.write("### FT")
+                df_dc_ft_h2h = calcola_double_chance(h2h_df, 'ft')
+                styled_df = df_dc_ft_h2h.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+                st.dataframe(styled_df)
 
             # Over Goals H2H
             col1, col2 = st.columns(2)
@@ -1143,7 +1291,7 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
                 df_btts_ft_h2h = calcola_btts_ft(h2h_df)
                 styled_df = df_btts_ft_h2h.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
                 st.dataframe(styled_df)
-
+                
             # Multi Gol H2H
             st.subheader(f"Multi Gol (H2H) ({len(h2h_df)})")
             col1, col2 = st.columns(2)
@@ -1159,6 +1307,11 @@ if h2h_home_team != "Seleziona..." and h2h_away_team != "Seleziona...":
             # First to Score H2H
             st.subheader(f"First to Score (H2H) ({len(h2h_df)})")
             styled_df = calcola_first_to_score(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
+            
+            # Nuova sezione: First to Score + Outcome H2H
+            st.subheader(f"First to Score + Risultato Finale (H2H) ({len(h2h_df)})")
+            styled_df = calcola_first_to_score_outcome(h2h_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
             st.dataframe(styled_df)
             
             # To Score H2H
