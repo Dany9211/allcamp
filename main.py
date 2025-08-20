@@ -291,6 +291,11 @@ def calcola_double_chance(df_to_analyze, period):
     elif period == 'ht':
         df_double_chance["gol_home"] = pd.to_numeric(df_double_chance["gol_home_ht"], errors='coerce')
         df_double_chance["gol_away"] = pd.to_numeric(df_double_chance["gol_away_ht"], errors='coerce')
+    elif period == 'sh':
+        df_double_chance["gol_home_sh"] = pd.to_numeric(df_double_chance["gol_home_ft"], errors='coerce') - pd.to_numeric(df_double_chance["gol_home_ht"], errors='coerce')
+        df_double_chance["gol_away_sh"] = pd.to_numeric(df_double_chance["gol_away_ft"], errors='coerce') - pd.to_numeric(df_double_chance["gol_away_ht"], errors='coerce')
+        df_double_chance["gol_home"] = df_double_chance["gol_home_sh"]
+        df_double_chance["gol_away"] = df_double_chance["gol_away_sh"]
     else:
         st.error("Periodo non valido per il calcolo della doppia chance.")
         return pd.DataFrame()
@@ -317,6 +322,57 @@ def calcola_double_chance(df_to_analyze, period):
     
     return df_stats
 
+
+# --- Funzione per calcolare le stats SH ---
+def calcola_stats_sh(df_to_analyze):
+    if df_to_analyze.empty:
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
+    
+    df_sh = df_to_analyze.copy()
+    
+    # Calcolo dei gol nel secondo tempo
+    df_sh["gol_home_sh"] = pd.to_numeric(df_sh["gol_home_ft"], errors='coerce') - pd.to_numeric(df_sh["gol_home_ht"], errors='coerce')
+    df_sh["gol_away_sh"] = pd.to_numeric(df_sh["gol_away_ft"], errors='coerce') - pd.to_numeric(df_sh["gol_away_ht"], errors='coerce')
+    
+    # Winrate SH
+    risultati_sh = {"1 (Casa)": 0, "X (Pareggio)": 0, "2 (Trasferta)": 0}
+    for _, row in df_sh.iterrows():
+        if row["gol_home_sh"] > row["gol_away_sh"]:
+            risultati_sh["1 (Casa)"] += 1
+        elif row["gol_home_sh"] < row["gol_away_sh"]:
+            risultati_sh["2 (Trasferta)"] += 1
+        else:
+            risultati_sh["X (Pareggio)"] += 1
+    
+    total_sh_matches = len(df_sh)
+    stats_sh_winrate = []
+    for esito, count in risultati_sh.items():
+        perc = round((count / total_sh_matches) * 100, 2) if total_sh_matches > 0 else 0
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        stats_sh_winrate.append((esito, count, perc, odd_min))
+    df_winrate_sh = pd.DataFrame(stats_sh_winrate, columns=["Esito", "Conteggio", "WinRate %", "Odd Minima"])
+    
+    # Over Goals SH
+    over_sh_data = []
+    df_sh["tot_goals_sh"] = df_sh["gol_home_sh"] + df_sh["gol_away_sh"]
+    for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
+        count = (df_sh["tot_goals_sh"] > t).sum()
+        perc = round((count / len(df_sh)) * 100, 2)
+        odd_min = round(100 / perc, 2) if perc > 0 else "-"
+        over_sh_data.append([f"Over {t} SH", count, perc, odd_min])
+    df_over_sh = pd.DataFrame(over_sh_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
+
+    # BTTS SH
+    btts_sh_count = ((df_sh["gol_home_sh"] > 0) & (df_sh["gol_away_sh"] > 0)).sum()
+    no_btts_sh_count = len(df_sh) - btts_sh_count
+    btts_sh_data = [
+        ["BTTS SI SH", btts_sh_count, round((btts_sh_count / total_sh_matches) * 100, 2) if total_sh_matches > 0 else 0],
+        ["BTTS NO SH", no_btts_sh_count, round((no_btts_sh_count / total_sh_matches) * 100, 2) if total_sh_matches > 0 else 0]
+    ]
+    df_btts_sh = pd.DataFrame(btts_sh_data, columns=["Mercato", "Conteggio", "Percentuale %"])
+    df_btts_sh["Odd Minima"] = df_btts_sh["Percentuale %"].apply(lambda x: round(100/x, 2) if x > 0 else "-")
+    
+    return df_winrate_sh, df_over_sh, df_btts_sh
 
 # --- FUNZIONE WINRATE ---
 def calcola_winrate(df, col_risultato):
@@ -904,32 +960,18 @@ if not filtered_df.empty:
         "Periodo": ["HT", "FT", "SH"],
         "Media Gol": [f"{avg_ht_goals:.2f}", f"{avg_ft_goals:.2f}", f"{avg_sh_goals:.2f}"]
     }))
-    
-    mostra_risultati_esatti(filtered_df, "risultato_ht", f"HT ({len(filtered_df)})")
-    mostra_risultati_esatti(filtered_df, "risultato_ft", f"FT ({len(filtered_df)})")
 
-    # WinRate con grafico
-    col1, col2 = st.columns(2)
-    with col1:
+    # --- Expander per Statistiche HT ---
+    with st.expander("Mostra Statistiche HT"):
+        mostra_risultati_esatti(filtered_df, "risultato_ht", f"HT ({len(filtered_df)})")
         st.subheader(f"WinRate HT ({len(filtered_df)})")
         df_winrate_ht = calcola_winrate(filtered_df, "risultato_ht")
         styled_df_ht = df_winrate_ht.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
         st.dataframe(styled_df_ht)
-    with col2:
-        st.subheader(f"WinRate FT ({len(filtered_df)})")
-        df_winrate_ft = calcola_winrate(filtered_df, "risultato_ft")
-        styled_df_ft = df_winrate_ft.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
-        st.dataframe(styled_df_ft)
-
-    # Over Goals HT e FT
-    col1, col2 = st.columns(2)
-    df_prematch_ht = filtered_df.copy()
-    df_prematch_ht["tot_goals_ht"] = pd.to_numeric(df_prematch_ht["gol_home_ht"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ht"], errors='coerce')
-    df_prematch_ht["tot_goals_ft"] = pd.to_numeric(df_prematch_ht["gol_home_ft"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ft"], errors='coerce')
-
-    with col1:
         st.subheader(f"Over Goals HT ({len(filtered_df)})")
         over_ht_data = []
+        df_prematch_ht = filtered_df.copy()
+        df_prematch_ht["tot_goals_ht"] = pd.to_numeric(df_prematch_ht["gol_home_ht"], errors='coerce') + pd.to_numeric(df_prematch_ht["gol_away_ht"], errors='coerce')
         for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
             count = (df_prematch_ht["tot_goals_ht"] > t).sum()
             perc = round((count / len(df_prematch_ht)) * 100, 2)
@@ -938,103 +980,105 @@ if not filtered_df.empty:
         df_over_ht = pd.DataFrame(over_ht_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
         styled_over_ht = df_over_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_over_ht)
+        st.subheader(f"BTTS HT ({len(filtered_df)})")
+        df_btts_ht = calcola_btts_ht(filtered_df)
+        styled_df = df_btts_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Doppia Chance HT ({len(filtered_df)})")
+        df_dc_ht = calcola_double_chance(filtered_df, 'ht')
+        styled_df = df_dc_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"First to Score HT ({len(filtered_df)})")
+        styled_df = calcola_first_to_score_ht(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"To Score HT ({len(filtered_df)})")
+        styled_df = calcola_to_score_ht(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+    
+    # --- Nuove Expander per Statistiche SH ---
+    with st.expander("Mostra Statistiche SH (Secondo Tempo)"):
+        st.write(f"Analisi basata su **{len(filtered_df)}** partite.")
+        df_winrate_sh, df_over_sh, df_btts_sh = calcola_stats_sh(filtered_df)
+        st.subheader(f"WinRate SH ({len(filtered_df)})")
+        styled_df = df_winrate_sh.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Over Goals SH ({len(filtered_df)})")
+        styled_df = df_over_sh.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"BTTS SH ({len(filtered_df)})")
+        styled_df = df_btts_sh.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Doppia Chance SH ({len(filtered_df)})")
+        df_dc_sh = calcola_double_chance(filtered_df, 'sh')
+        styled_df = df_dc_sh.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
 
-    with col2:
+    # --- Expander per Statistiche FT ---
+    with st.expander("Mostra Statistiche FT (Finale)"):
+        mostra_risultati_esatti(filtered_df, "risultato_ft", f"FT ({len(filtered_df)})")
+        st.subheader(f"WinRate FT ({len(filtered_df)})")
+        df_winrate_ft = calcola_winrate(filtered_df, "risultato_ft")
+        styled_df_ft = df_winrate_ft.style.background_gradient(cmap='RdYlGn', subset=['WinRate %'])
+        st.dataframe(styled_df_ft)
         st.subheader(f"Over Goals FT ({len(filtered_df)})")
         over_ft_data = []
+        df_prematch_ft = filtered_df.copy()
+        df_prematch_ft["tot_goals_ft"] = pd.to_numeric(df_prematch_ft["gol_home_ft"], errors='coerce') + pd.to_numeric(df_prematch_ft["gol_away_ft"], errors='coerce')
         for t in [0.5, 1.5, 2.5, 3.5, 4.5, 5.5]:
-            count = (df_prematch_ht["tot_goals_ft"] > t).sum()
-            perc = round((count / len(df_prematch_ht)) * 100, 2)
+            count = (df_prematch_ft["tot_goals_ft"] > t).sum()
+            perc = round((count / len(df_prematch_ft)) * 100, 2)
             odd_min = round(100 / perc, 2) if perc > 0 else "-"
             over_ft_data.append([f"Over {t} FT", count, perc, odd_min])
         df_over_ft = pd.DataFrame(over_ft_data, columns=["Mercato", "Conteggio", "Percentuale %", "Odd Minima"])
         styled_over_ft = df_over_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_over_ft)
-        
-    # BTTS
-    st.subheader(f"BTTS (Pre-Match) ({len(filtered_df)})")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### HT")
-        df_btts_ht = calcola_btts_ht(filtered_df)
-        styled_df = df_btts_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-        st.dataframe(styled_df)
-    with col2:
-        st.write("### FT")
+        st.subheader(f"BTTS FT ({len(filtered_df)})")
         df_btts_ft = calcola_btts_ft(filtered_df)
         styled_df = df_btts_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-    
-    # Doppia Chance Pre-Match
-    st.subheader(f"Doppia Chance (Pre-Match) ({len(filtered_df)})")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### HT")
-        df_dc_ht = calcola_double_chance(filtered_df, 'ht')
-        styled_df = df_dc_ht.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-        st.dataframe(styled_df)
-    with col2:
-        st.write("### FT")
+        st.subheader(f"Doppia Chance FT ({len(filtered_df)})")
         df_dc_ft = calcola_double_chance(filtered_df, 'ft')
         styled_df = df_dc_ft.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-
-    # Multi Gol
-    st.subheader(f"Multi Gol (Pre-Match) ({len(filtered_df)})")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("### Casa")
-        styled_df = calcola_multi_gol(filtered_df, "gol_home_ft", "Home").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.subheader(f"Multi Gol (Pre-Match) ({len(filtered_df)})")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("### Casa")
+            styled_df = calcola_multi_gol(filtered_df, "gol_home_ft", "Home").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
+        with col2:
+            st.write("### Trasferta")
+            styled_df = calcola_multi_gol(filtered_df, "gol_away_ft", "Away").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
+        st.subheader(f"First to Score (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_first_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-    with col2:
-        st.write("### Trasferta")
-        styled_df = calcola_multi_gol(filtered_df, "gol_away_ft", "Away").style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.subheader(f"First to Score + Risultato Finale (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_first_to_score_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-
-    # First to Score
-    st.subheader(f"First to Score (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_first_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-    
-    # First to Score + Outcome
-    st.subheader(f"First to Score + Risultato Finale (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_first_to_score_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-
-    # First to Score + Next Goal
-    st.subheader(f"First to Score + Risultato Prossimo Gol (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_first_to_score_next_goal_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-    
-    # To Score
-    st.subheader(f"To Score (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-    
-    # Clean Sheet
-    st.subheader(f"Clean Sheet (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_clean_sheet(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-    
-    # Combo Markets
-    st.subheader(f"Combo Markets (Pre-Match) ({len(filtered_df)})")
-    styled_df = calcola_combo_stats(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
-    st.dataframe(styled_df)
-    
-    # Analisi Rimonte
-    st.subheader(f"Analisi Rimonte (Pre-Match) ({len(filtered_df)})")
-    rimonte_stats, squadre_rimonte = calcola_rimonte(filtered_df, "Pre-Match")
-    if not rimonte_stats.empty:
-        styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.subheader(f"First to Score + Risultato Prossimo Gol (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_first_to_score_next_goal_outcome(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
         st.dataframe(styled_df)
-        
-        st.markdown("**Squadre che hanno effettuato rimonte:**")
-        for tipo, squadre in squadre_rimonte.items():
-            if squadre:
-                st.markdown(f"**{tipo}:** {', '.join(squadre)}")
-    else:
-        st.warning("Nessuna rimonta trovata nel dataset filtrato.")
-
+        st.subheader(f"To Score (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_to_score(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Clean Sheet (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_clean_sheet(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Combo Markets (Pre-Match) ({len(filtered_df)})")
+        styled_df = calcola_combo_stats(filtered_df).style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+        st.dataframe(styled_df)
+        st.subheader(f"Analisi Rimonte (Pre-Match) ({len(filtered_df)})")
+        rimonte_stats, squadre_rimonte = calcola_rimonte(filtered_df, "Pre-Match")
+        if not rimonte_stats.empty:
+            styled_df = rimonte_stats.style.background_gradient(cmap='RdYlGn', subset=['Percentuale %'])
+            st.dataframe(styled_df)
+            st.markdown("**Squadre che hanno effettuato rimonte:**")
+            for tipo, squadre in squadre_rimonte.items():
+                if squadre:
+                    st.markdown(f"**{tipo}:** {', '.join(squadre)}")
+        else:
+            st.warning("Nessuna rimonta trovata nel dataset filtrato.")
 else:
     st.warning("Nessuna partita corrisponde ai filtri selezionati per l'analisi pre-match.")
 
